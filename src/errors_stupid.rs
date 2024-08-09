@@ -29,3 +29,16 @@ impl Display for HttpServerError {
         write!(f, "HttpServerError")
     }
 }
+
+#[derive(Debug)]
+pub struct subStringError {
+    pub source: String,
+}
+
+impl Error for subStringError {}
+
+impl Display for subStringError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "HttpServerError")
+    }
+}

@@ -4,7 +4,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
 };
 
-use crate::errors_stupid::HttpServerError;
+use crate::{errors_stupid::HttpServerError, findSubString};
 
 #[derive(Debug)]
 pub struct HttpServer {
@@ -95,10 +95,10 @@ impl HttpServer {
         connectionData: Vec<u8>,
     ) -> Result<parseReturnData, HttpServerError> {
         let mut startRead: usize = 0;
-        let mut endRead: usize = 0;
+        let mut endRead: usize;
         let mut counter: usize = 0;
 
-        while true {
+        loop {
             if connectionData[counter] == 13 {
                 endRead = counter;
                 break;
@@ -109,6 +109,13 @@ impl HttpServer {
         for i in startRead..endRead {
             print!("{}", connectionData[i] as char)
         }
+
+        let toParse = Vec::from_iter(connectionData[startRead..endRead].iter().cloned());
+
+        let toFind: String = "HTTP".to_string();
+
+        println!("Location is {}", findSubString(toParse, toFind).unwrap());
+
         Ok(parseReturnData {
             httpVersion: 1,
             requestType: requestType::GET,
