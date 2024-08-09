@@ -1,3 +1,4 @@
+use core::str;
 use std::{
     error::Error,
     fmt::Debug,
@@ -109,12 +110,21 @@ impl HttpServer {
         for i in startRead..endRead {
             print!("{}", connectionData[i] as char)
         }
+        println!("");
 
         let toParse = Vec::from_iter(connectionData[startRead..endRead].iter().cloned());
 
-        let toFind: String = "HTTP".to_string();
+        let toFind: String = "GET".to_string();
 
-        println!("Location is {}", findSubString(toParse, toFind).unwrap());
+        let location = findSubString(toParse, toFind.clone()).unwrap();
+
+        for i in location as usize..toFind.len() {
+            println!("String found {}", connectionData[i] as char)
+        }
+
+        let parsed_data = str::from_utf8(&connectionData[location as usize..toFind.len()]).unwrap();
+
+        println!("The PARSED DATA ISSSS: {}", parsed_data);
 
         Ok(parseReturnData {
             httpVersion: 1,
