@@ -3,9 +3,10 @@ use std::{
     error::Error,
     fmt::Debug,
     net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
+    usize,
 };
 
-use crate::{errors_stupid::HttpServerError, findSubString};
+use crate::{errors_stupid::HttpServerError, standard_stupid::findSubStringWithBytes};
 
 #[derive(Debug)]
 pub struct HttpServer {
@@ -99,32 +100,17 @@ impl HttpServer {
         let mut endRead: usize;
         let mut counter: usize = 0;
 
-        loop {
-            if connectionData[counter] == 13 {
-                endRead = counter;
-                break;
-            }
-            counter += 1;
+        let toFind: Vec<u8> = vec![0x0d, 0x0a];
+
+        let location = findSubStringWithBytes(connectionData.clone(), toFind).unwrap();
+
+        let snip = connectionData[0..location as usize].to_vec();
+
+        for i in 0..snip.len() {
+            println!("Charachter {} is {}", i, snip[i] as char)
         }
 
-        for i in startRead..endRead {
-            print!("{}", connectionData[i] as char)
-        }
-        println!("");
-
-        let toParse = Vec::from_iter(connectionData[startRead..endRead].iter().cloned());
-
-        let toFind: String = "GET".to_string();
-
-        let location = findSubString(toParse, toFind.clone()).unwrap();
-
-        for i in location as usize..toFind.len() {
-            println!("String found {}", connectionData[i] as char)
-        }
-
-        let parsed_data = str::from_utf8(&connectionData[location as usize..toFind.len()]).unwrap();
-
-        println!("The PARSED DATA ISSSS: {}", parsed_data);
+        println!("Location is: {}", location);
 
         Ok(parseReturnData {
             httpVersion: 1,
