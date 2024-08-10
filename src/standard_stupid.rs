@@ -30,17 +30,10 @@ pub fn findSubStringWithString(array: Vec<u8>, subString: String) -> Result<u32,
     let subStringLength = subString.len();
     let mut location: Option<u32> = None;
 
-    for i in 0..subStringAsBytes.len() {
-        println!("Byte is {}", subStringAsBytes[i])
-    }
-
     for i in 0..(array.len() - 1) {
         if array[i] == subStringAsBytes[0] {
             let compare = array[i..i + subStringLength].to_vec();
 
-            for i in 0..compare.len() {
-                println!("Bytes for compare are: {}", compare[i]);
-            }
             if compare == subStringAsBytes {
                 location = Some(i as u32);
                 break;
@@ -55,24 +48,18 @@ pub fn findSubStringWithString(array: Vec<u8>, subString: String) -> Result<u32,
         }),
     }
 }
+
 pub fn findSubStringWithBytes(
     array: Vec<u8>,
-    subStringAsBytes: Vec<u8>,
+    subStringAsBytes: &[u8],
 ) -> Result<u32, subStringError> {
     let subStringLength = subStringAsBytes.len();
     let mut location: Option<u32> = None;
-
-    for i in 0..subStringAsBytes.len() {
-        println!("Byte is {}", subStringAsBytes[i])
-    }
 
     for i in 0..(array.len() - 1) {
         if array[i] == subStringAsBytes[0] {
             let compare = array[i..i + subStringLength].to_vec();
 
-            for i in 0..compare.len() {
-                println!("Bytes for compare are: {}", compare[i]);
-            }
             if compare == subStringAsBytes {
                 location = Some(i as u32);
                 break;

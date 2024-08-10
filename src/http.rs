@@ -1,12 +1,14 @@
-use core::str;
 use std::{
     error::Error,
     fmt::Debug,
     net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
-    usize,
+    str, usize,
 };
 
-use crate::{errors_stupid::HttpServerError, standard_stupid::findSubStringWithBytes};
+use crate::{
+    errors_stupid::HttpServerError, findSubStringWithString,
+    standard_stupid::findSubStringWithBytes,
+};
 
 #[derive(Debug)]
 pub struct HttpServer {
@@ -22,20 +24,22 @@ pub enum connectionReturn {
 }
 #[derive(Debug)]
 pub enum requestType {
-    OPTIONS,
     GET,
-    HEAD,
     POST,
+    OPTIONS,
+    HEAD,
     PUT,
     DELETE,
     TRACE,
     CONNECT,
+    INVALID,
 }
 
 #[derive(Debug)]
 pub struct parseReturnData {
-    httpVersion: u8,
+    httpVersion: f32,
     requestType: requestType,
+    requestPath: String,
     host: String,
     userAgent: String,
     dataType: String,
@@ -94,27 +98,60 @@ impl HttpServer {
 
     pub fn parseConnection(
         &mut self,
-        connectionData: Vec<u8>,
+        mut connectionData: Vec<u8>,
     ) -> Result<parseReturnData, HttpServerError> {
-        let mut startRead: usize = 0;
-        let mut endRead: usize;
-        let mut counter: usize = 0;
+        let requestTypeGiven: requestType;
 
-        let toFind: Vec<u8> = vec![0x0d, 0x0a];
+        // Find what method is being used
+        let Methodlocation =
+            findSubStringWithString(connectionData.clone(), "/".to_string()).unwrap();
 
-        let location = findSubStringWithBytes(connectionData.clone(), toFind).unwrap();
+        let snip = str::from_utf8(&connectionData[0..Methodlocation as usize - 1]).unwrap();
 
-        let snip = connectionData[0..location as usize].to_vec();
-
-        for i in 0..snip.len() {
-            println!("Charachter {} is {}", i, snip[i] as char)
+        match snip {
+            "GET" => requestTypeGiven = requestType::GET,
+            "POST" => requestTypeGiven = requestType::POST,
+            "HEAD" => requestTypeGiven = requestType::HEAD,
+            "PUT" => requestTypeGiven = requestType::PUT,
+            "CONNECT" => requestTypeGiven = requestType::CONNECT,
+            "DELETE" => requestTypeGiven = requestType::DELETE,
+            "TRACE" => requestTypeGiven = requestType::TRACE,
+            "OPTIONS" => requestTypeGiven = requestType::OPTIONS,
+            _ => requestTypeGiven = requestType::INVALID,
         }
 
-        println!("Location is: {}", location);
+        connectionData.drain(0..Methodlocation as usize);
 
+        // Find the H to know the entire path
+        let PathLocation = findSubStringWithBytes(connectionData.clone(), &[0x48]).unwrap();
+
+        let requestPathGiven = str::from_utf8(&connectionData[0..PathLocation as usize - 1])
+            .unwrap()
+            .to_string();
+
+        connectionData.drain(0..PathLocation as usize);
+
+        // Find the first CLRF
+        let HTTPlocation = findSubStringWithBytes(connectionData.clone(), &[0x0a]).unwrap();
+
+        let HTTPVersionGiven: f32 = str::from_utf8(&connectionData[5..HTTPlocation as usize - 1])
+            .unwrap()
+            .parse()
+            .unwrap();
+
+        connectionData.drain(0..PathLocation as usize + 1);
+
+        println!("Left over data:");
+        for i in 0..connectionData.len() {
+            print!("{}", connectionData[i] as char);
+        }
+        println!("HTTP Version found is: {:?}", HTTPVersionGiven);
+        println!("Request path found is: {:?}", requestPathGiven);
+        println!("Request type found is: {:?}", requestTypeGiven);
         Ok(parseReturnData {
-            httpVersion: 1,
-            requestType: requestType::GET,
+            httpVersion: HTTPVersionGiven,
+            requestType: requestTypeGiven,
+            requestPath: requestPathGiven,
             host: "127.0.0.1".to_owned().to_string(),
             userAgent: "Test".to_owned().to_string(),
             dataType: "Test".to_owned().to_string(),
