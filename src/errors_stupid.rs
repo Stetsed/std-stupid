@@ -1,6 +1,7 @@
 use core::fmt;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::str::Utf8Error;
 
 pub mod errors_stupid {}
 
@@ -40,5 +41,20 @@ impl Error for subStringError {}
 impl Display for subStringError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "HttpServerError")
+    }
+}
+
+#[derive(Debug)]
+pub enum httpReturnError {
+    httpServerError(HttpServerError),
+    subStringError(subStringError),
+    Utf8ParsingError(Utf8Error),
+}
+
+impl Error for httpReturnError {}
+
+impl Display for httpReturnError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Httpreturn")
     }
 }

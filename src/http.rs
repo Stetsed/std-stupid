@@ -1,4 +1,6 @@
 use std::{
+    borrow::Borrow,
+    collections::HashMap,
     error::Error,
     fmt::Debug,
     net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
@@ -40,9 +42,7 @@ pub struct parseReturnData {
     httpVersion: f32,
     requestType: requestType,
     requestPath: String,
-    host: String,
-    userAgent: String,
-    dataType: String,
+    headers: HashMap<String, String>,
 }
 
 impl HttpServer {
@@ -100,61 +100,124 @@ impl HttpServer {
         &mut self,
         mut connectionData: Vec<u8>,
     ) -> Result<parseReturnData, HttpServerError> {
-        let requestTypeGiven: requestType;
-
         // Find what method is being used
-        let Methodlocation =
-            findSubStringWithString(connectionData.clone(), "/".to_string()).unwrap();
+        let MethodlocationCall = findSubStringWithString(connectionData.clone(), "/".to_string());
 
-        let snip = str::from_utf8(&connectionData[0..Methodlocation as usize - 1]).unwrap();
+        let MethodLocation = match MethodlocationCall {
+            Ok(m) => MethodlocationCall.unwrap(),
+            Err(_) => {
+                return Err(HttpServerError {
+                    source: "Failed to find the / as part of the method location".to_string(),
+                });
+            }
+        };
 
-        match snip {
-            "GET" => requestTypeGiven = requestType::GET,
-            "POST" => requestTypeGiven = requestType::POST,
-            "HEAD" => requestTypeGiven = requestType::HEAD,
-            "PUT" => requestTypeGiven = requestType::PUT,
-            "CONNECT" => requestTypeGiven = requestType::CONNECT,
-            "DELETE" => requestTypeGiven = requestType::DELETE,
-            "TRACE" => requestTypeGiven = requestType::TRACE,
-            "OPTIONS" => requestTypeGiven = requestType::OPTIONS,
-            _ => requestTypeGiven = requestType::INVALID,
-        }
+        let snip =
+            str::from_utf8(&connectionData[0..MethodLocation as usize - 1]).unwrap_or(panic!(
+            "This shouldn't be possible, it failed to turn the connection data snip into a str..."
+        ));
 
-        connectionData.drain(0..Methodlocation as usize);
+        let requestTypeGiven = match snip {
+            "GET" => requestType::GET,
+            "POST" => requestType::POST,
+            "HEAD" => requestType::HEAD,
+            "PUT" => requestType::PUT,
+            "CONNECT" => requestType::CONNECT,
+            "DELETE" => requestType::DELETE,
+            "TRACE" => requestType::TRACE,
+            "OPTIONS" => requestType::OPTIONS,
+            _ => requestType::INVALID,
+        };
+
+        connectionData.drain(0..MethodLocation as usize);
 
         // Find the H to know the entire path
-        let PathLocation = findSubStringWithBytes(connectionData.clone(), &[0x48]).unwrap();
+        let RequestPathLocationCall = findSubStringWithBytes(connectionData.clone(), &[0x48]);
 
-        let requestPathGiven = str::from_utf8(&connectionData[0..PathLocation as usize - 1])
-            .unwrap()
+        let RequestPathLocation = match MethodlocationCall {
+            Ok(m) => MethodlocationCall.unwrap(),
+            Err(_) => {
+                return Err(HttpServerError {
+                    source: "Failed to find the H as part of the Request Path location".to_string(),
+                });
+            }
+        };
+
+        let requestPathGiven = str::from_utf8(&connectionData[0..RequestPathLocation as usize - 1])
+            .unwrap_or(panic!(
+            "this shouldn't be possible, it failed to turn the connection data snip into a str..."
+        ))
             .to_string();
 
-        connectionData.drain(0..PathLocation as usize);
+        connectionData.drain(0..RequestPathLocation as usize);
 
         // Find the first CLRF
         let HTTPlocation = findSubStringWithBytes(connectionData.clone(), &[0x0a]).unwrap();
 
         let HTTPVersionGiven: f32 = str::from_utf8(&connectionData[5..HTTPlocation as usize - 1])
-            .unwrap()
-            .parse()
-            .unwrap();
+            .unwrap_or(panic!(
+            "this shouldn't be possible, it failed to turn the connection data snip into a str..."
+        ))
+            .parse()?;
 
-        connectionData.drain(0..PathLocation as usize + 1);
+        let mut headerHashMap: HashMap<String, String> = HashMap::new();
 
-        println!("Left over data:");
-        for i in 0..connectionData.len() {
-            print!("{}", connectionData[i] as char);
+        connectionData.drain(0..RequestPathLocation as usize + 1);
+
+        while connectionData.len() >= 3 {
+            let headerCLRFLocation =
+                findSubStringWithBytes(connectionData.clone(), &[0x0a]).unwrap_or(0);
+
+            let headerCLRFLocationGet: u32;
+            let headerCLRFLocationDrain: usize;
+
+            if headerCLRFLocation == 0 {
+                headerCLRFLocationGet = connectionData.len() as u32;
+                headerCLRFLocationDrain = connectionData.len();
+            } else {
+                headerCLRFLocationGet = headerCLRFLocation - 1;
+                headerCLRFLocationDrain = (headerCLRFLocation + 1) as usize;
+            }
+            let mut headerSupplied = connectionData[0..headerCLRFLocationGet as usize].to_vec();
+
+            let headerDoublePeriodLocation =
+                findSubStringWithBytes(headerSupplied.as_slice().to_vec(), &[0x3a]).unwrap();
+
+            let headerName =
+                str::from_utf8(&headerSupplied[0..headerDoublePeriodLocation as usize])
+                    .unwrap()
+                    .to_string();
+
+            let headerContentCall = str::from_utf8(
+                &headerSupplied
+                    [headerDoublePeriodLocation as usize + 2..headerCLRFLocationGet as usize],
+            );
+
+            match headerContentCall {
+                Ok(m) => headerHashMap.insert(headerName, m.to_string()),
+                Err(_) => {
+                    return Err(HttpServerError {
+                        source: "It says fuck you bitch".to_string(),
+                    });
+                }
+            };
+
+            connectionData.drain(0..headerCLRFLocationDrain);
         }
+
+        connectionData.drain(..);
+
         println!("HTTP Version found is: {:?}", HTTPVersionGiven);
         println!("Request path found is: {:?}", requestPathGiven);
         println!("Request type found is: {:?}", requestTypeGiven);
+        for (header, content) in &headerHashMap {
+            println!("Header: {header} : {content}");
+        }
         Ok(parseReturnData {
             httpVersion: HTTPVersionGiven,
             requestType: requestTypeGiven,
             requestPath: requestPathGiven,
-            host: "127.0.0.1".to_owned().to_string(),
-            userAgent: "Test".to_owned().to_string(),
-            dataType: "Test".to_owned().to_string(),
+            headers: headerHashMap,
         })
     }
 }
