@@ -4,12 +4,12 @@ use std::{
     error::Error,
     fmt::Debug,
     net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
-    str, usize,
+    str,
 };
 
 use crate::{
     errors_stupid::HttpServerError, findSubStringWithString,
-    standard_stupid::findSubStringWithBytes,
+    standard_stupid::findSubStringWithBytes, HttpReturnError,
 };
 
 #[derive(Debug)]
@@ -24,6 +24,7 @@ pub enum connectionReturn {
     TcpStream,
     SocketAddr,
 }
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub enum requestType {
     GET,
@@ -37,6 +38,7 @@ pub enum requestType {
     INVALID,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct parseReturnData {
     httpVersion: f32,
@@ -99,25 +101,24 @@ impl HttpServer {
     pub fn parseConnection(
         &mut self,
         mut connectionData: Vec<u8>,
-    ) -> Result<parseReturnData, HttpServerError> {
-        // Find what method is being used
-        let MethodlocationCall = findSubStringWithString(connectionData.clone(), "/".to_string());
-
-        let MethodLocation = match MethodlocationCall {
-            Ok(m) => MethodlocationCall.unwrap(),
+    ) -> Result<parseReturnData, HttpReturnError> {
+        // Find the / to find the method being used
+        let MethodLocation = match findSubStringWithString(connectionData.clone(), "/".to_string())
+        {
+            Ok(o) => o,
             Err(_) => {
-                return Err(HttpServerError {
-                    source: "Failed to find the / as part of the method location".to_string(),
-                });
+                return Err(HttpReturnError::HttpServerError(HttpServerError::new(
+                    "Failed to find / to find method",
+                )))
             }
         };
 
-        let snip =
-            str::from_utf8(&connectionData[0..MethodLocation as usize - 1]).unwrap_or(panic!(
-            "This shouldn't be possible, it failed to turn the connection data snip into a str..."
-        ));
+        let snip = match str::from_utf8(&connectionData[0..MethodLocation as usize - 1]) {
+            Ok(o) => o,
+            Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
+        };
 
-        let requestTypeGiven = match snip {
+        let requestTypeGiven: requestType = match snip {
             "GET" => requestType::GET,
             "POST" => requestType::POST,
             "HEAD" => requestType::HEAD,
@@ -132,33 +133,30 @@ impl HttpServer {
         connectionData.drain(0..MethodLocation as usize);
 
         // Find the H to know the entire path
-        let RequestPathLocationCall = findSubStringWithBytes(connectionData.clone(), &[0x48]);
-
-        let RequestPathLocation = match MethodlocationCall {
-            Ok(m) => MethodlocationCall.unwrap(),
-            Err(_) => {
-                return Err(HttpServerError {
-                    source: "Failed to find the H as part of the Request Path location".to_string(),
-                });
-            }
+        let RequestPathLocation = match findSubStringWithBytes(connectionData.clone(), &[0x48]) {
+            Ok(o) => o,
+            Err(e) => return Err(HttpReturnError::SubStringError(e)),
         };
 
-        let requestPathGiven = str::from_utf8(&connectionData[0..RequestPathLocation as usize - 1])
-            .unwrap_or(panic!(
-            "this shouldn't be possible, it failed to turn the connection data snip into a str..."
-        ))
-            .to_string();
+        let requestPathGiven: String =
+            match str::from_utf8(&connectionData[0..RequestPathLocation as usize - 1]) {
+                Ok(o) => o.to_string(),
+                Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
+            };
 
         connectionData.drain(0..RequestPathLocation as usize);
 
         // Find the first CLRF
-        let HTTPlocation = findSubStringWithBytes(connectionData.clone(), &[0x0a]).unwrap();
+        let HTTPlocation = match findSubStringWithBytes(connectionData.clone(), &[0x0a]) {
+            Ok(o) => o,
+            Err(e) => return Err(HttpReturnError::SubStringError(e)),
+        };
 
-        let HTTPVersionGiven: f32 = str::from_utf8(&connectionData[5..HTTPlocation as usize - 1])
-            .unwrap_or(panic!(
-            "this shouldn't be possible, it failed to turn the connection data snip into a str..."
-        ))
-            .parse()?;
+        let HTTPVersionGiven: f32 =
+            match str::from_utf8(&connectionData[5..HTTPlocation as usize - 1]) {
+                Ok(o) => o.parse().unwrap(),
+                Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
+            };
 
         let mut headerHashMap: HashMap<String, String> = HashMap::new();
 
@@ -178,28 +176,23 @@ impl HttpServer {
                 headerCLRFLocationGet = headerCLRFLocation - 1;
                 headerCLRFLocationDrain = (headerCLRFLocation + 1) as usize;
             }
-            let mut headerSupplied = connectionData[0..headerCLRFLocationGet as usize].to_vec();
+            let headerSupplied = connectionData[0..headerCLRFLocationGet as usize].to_vec();
 
             let headerDoublePeriodLocation =
                 findSubStringWithBytes(headerSupplied.as_slice().to_vec(), &[0x3a]).unwrap();
 
             let headerName =
-                str::from_utf8(&headerSupplied[0..headerDoublePeriodLocation as usize])
-                    .unwrap()
-                    .to_string();
+                match str::from_utf8(&headerSupplied[0..headerDoublePeriodLocation as usize]) {
+                    Ok(o) => o.to_string(),
+                    Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
+                };
 
-            let headerContentCall = str::from_utf8(
+            match str::from_utf8(
                 &headerSupplied
                     [headerDoublePeriodLocation as usize + 2..headerCLRFLocationGet as usize],
-            );
-
-            match headerContentCall {
-                Ok(m) => headerHashMap.insert(headerName, m.to_string()),
-                Err(_) => {
-                    return Err(HttpServerError {
-                        source: "It says fuck you bitch".to_string(),
-                    });
-                }
+            ) {
+                Ok(o) => headerHashMap.insert(headerName, o.to_string()),
+                Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
             };
 
             connectionData.drain(0..headerCLRFLocationDrain);

@@ -3,11 +3,17 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
-pub mod errors_stupid {}
-
 #[derive(Debug)]
 pub struct intValueError {
     pub source: String,
+}
+
+impl intValueError {
+    pub fn new<T: Into<String>>(source: T) -> Self {
+        intValueError {
+            source: source.into(),
+        }
+    }
 }
 
 impl Error for intValueError {}
@@ -21,6 +27,14 @@ impl Display for intValueError {
 #[derive(Debug)]
 pub struct HttpServerError {
     pub source: String,
+}
+
+impl HttpServerError {
+    pub fn new<T: Into<String>>(source: T) -> Self {
+        HttpServerError {
+            source: source.into(),
+        }
+    }
 }
 
 impl Error for HttpServerError {}
@@ -44,16 +58,26 @@ impl Display for subStringError {
     }
 }
 
-#[derive(Debug)]
-pub enum httpReturnError {
-    httpServerError(HttpServerError),
-    subStringError(subStringError),
-    Utf8ParsingError(Utf8Error),
+impl subStringError {
+    pub fn new<T: Into<String>>(source: T) -> Self {
+        subStringError {
+            source: source.into(),
+        }
+    }
 }
 
-impl Error for httpReturnError {}
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum HttpReturnError {
+    HttpServerError(crate::HttpServerError),
+    IntValueError(crate::intValueError),
+    SubStringError(crate::subStringError),
+    Utf8ParsingError(std::str::Utf8Error),
+}
 
-impl Display for httpReturnError {
+impl Error for HttpReturnError {}
+
+impl Display for HttpReturnError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Httpreturn")
     }
