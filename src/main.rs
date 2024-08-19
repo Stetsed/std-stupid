@@ -7,12 +7,12 @@ mod standard_stupid;
 
 use core::fmt;
 use std::default::Default;
-use std::error;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{prelude::*, stdin, Error};
 use std::net::Ipv4Addr;
 use std::process::{exit, Termination};
+use std::{error, io};
 
 use errors_stupid::*;
 use http::*;
@@ -33,27 +33,20 @@ fn main() -> Result<(), Error> {
     };
     HttpServer.setupListener();
 
-    let mut connection = HttpServer.acceptConnection().unwrap();
+    for stream in HttpServer.TcpListener.as_ref().unwrap().incoming() {
+        match stream {
+            Ok(mut o) => {
+                let mut recieveBuffer: Vec<u8> = Vec::new();
+                o.read_to_end(&mut recieveBuffer).unwrap();
 
-    let mut recieveBuffer = Vec::new();
-    let b = connection.0.read_to_end(&mut recieveBuffer).unwrap();
-
-    // println!("Bytes read: {}", b);
-    // print!("{}", String::from_utf8(recieveBuffer.clone()).unwrap());
-    //
-    // for i in 0..recieveBuffer.len() {
-    //     println!(
-    //         "Raw data: {} Char: {}",
-    //         recieveBuffer[i],
-    //         char::from(recieveBuffer[i])
-    //     );
-    // }
-
-    // let mut buffer = "19281828821".as_bytes();
-    //
-    // connection.0.write_all(buffer);
-
-    HttpServer.parseConnection(recieveBuffer);
+                parseHTTPConnection(recieveBuffer);
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                continue;
+            }
+            Err(e) => panic!("wtf"),
+        }
+    }
 
     Ok(())
 }
