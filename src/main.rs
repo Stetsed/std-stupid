@@ -9,13 +9,16 @@ use core::fmt;
 use std::default::Default;
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{prelude::*, stdin, Error};
+use std::io::{prelude::*, stdin, BufReader, BufWriter, Error};
 use std::net::Ipv4Addr;
 use std::process::{exit, Termination};
+use std::time::Duration;
 use std::{error, io};
 
 use errors_stupid::*;
 use http::*;
+use httpParser::*;
+use httpStruct::*;
 use random_stupid::*;
 use standard_stupid::*;
 
@@ -23,12 +26,8 @@ fn main() -> Result<(), Error> {
     let IpAddressToUse: String = "127.0.0.1".to_string();
     let portTouse: u16 = 9182;
 
-    let HttpServerSetup = HttpServer::new(Some(IpAddressToUse), Some(portTouse));
-
-    let mut HttpServer: HttpServer;
-
-    match HttpServerSetup {
-        Ok(_) => HttpServer = HttpServerSetup.unwrap(),
+    let mut HttpServer = match HttpServer::new(Some(IpAddressToUse), Some(portTouse)) {
+        Ok(o) => o,
         Err(e) => panic!("{e:?}"),
     };
     HttpServer.setupListener();
@@ -36,15 +35,21 @@ fn main() -> Result<(), Error> {
     for stream in HttpServer.TcpListener.as_ref().unwrap().incoming() {
         match stream {
             Ok(mut o) => {
-                let mut recieveBuffer: Vec<u8> = Vec::new();
-                o.read_to_end(&mut recieveBuffer).unwrap();
+                let mut reader = BufReader::new(&o);
 
-                parseHTTPConnection(recieveBuffer);
+                let recieveBuffer = reader.fill_buf().unwrap().to_vec();
+
+                let data = match parseHTTPConnection(recieveBuffer) {
+                    Ok(o) => o,
+                    Err(e) => panic!("Yo {:?}", e),
+                };
+
+                o.write_all(composeHttpResponse(HttpServer.GetServerFunction(), data).as_slice());
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 continue;
             }
-            Err(e) => panic!("wtf"),
+            Err(e) => panic!("wtf {:?}", e),
         }
     }
 
