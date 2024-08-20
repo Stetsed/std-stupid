@@ -11,56 +11,32 @@ use std::{
 
 use crate::{
     errors_stupid::HttpServerError, findSubStringWithString, httpStruct::*, http_stupid::*,
-    standard_stupid::findSubStringWithBytes, HttpReturnError,
+    standard_stupid::findSubStringWithBytes,
 };
 
-pub fn parseHTTPConnection(
-    mut connectionData: Vec<u8>,
-) -> Result<ParseReturnData, HttpReturnError> {
+pub fn parseHTTPConnection(mut connectionData: Vec<u8>) -> Result<ParseReturnData, StdStupidError> {
     // Find the / to find the method being used
-    let MethodLocation = match findSubStringWithBytes(connectionData.clone(), b"/") {
-        Ok(o) => o,
-        Err(_) => {
-            return Err(HttpReturnError::HttpServerError(HttpServerError::new(
-                "Failed to find / to find method",
-            )))
-        }
-    };
+    let MethodLocation = findSubStringWithBytes(connectionData.clone(), b"/")?;
 
-    let RequestTypeRaw = match str::from_utf8(&connectionData[0..MethodLocation as usize - 1]) {
-        Ok(o) => o,
-        Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
-    };
+    let RequestTypeRaw = str::from_utf8(&connectionData[0..MethodLocation as usize - 1])?;
 
     let HttpRequestTypeGiven: HttpRequestType = parseHttpRequestType(RequestTypeRaw);
 
     connectionData.drain(0..MethodLocation as usize);
 
     // Find the H to know the entire path
-    let RequestPathLocation = match findSubStringWithBytes(connectionData.clone(), &[0x48]) {
-        Ok(o) => o,
-        Err(e) => return Err(HttpReturnError::SubStringError(e)),
-    };
+    let RequestPathLocation = findSubStringWithBytes(connectionData.clone(), &[0x48])?;
 
     let requestPathGiven: String =
-        match str::from_utf8(&connectionData[0..RequestPathLocation as usize - 1]) {
-            Ok(o) => o.to_string(),
-            Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
-        };
+        str::from_utf8(&connectionData[0..RequestPathLocation as usize - 1])?.to_string();
 
     connectionData.drain(0..RequestPathLocation as usize);
 
     // Find the first CLRF
-    let HTTPlocation = match findSubStringWithBytes(connectionData.clone(), &[0x0a]) {
-        Ok(o) => o,
-        Err(e) => return Err(HttpReturnError::SubStringError(e)),
-    };
+    let HTTPlocation = findSubStringWithBytes(connectionData.clone(), &[0x0a])?;
 
-    let HTTPVersionGiven: f32 = match str::from_utf8(&connectionData[5..HTTPlocation as usize - 1])
-    {
-        Ok(o) => o.parse().unwrap(),
-        Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
-    };
+    let HTTPVersionGiven: f32 =
+        str::from_utf8(&connectionData[5..HTTPlocation as usize - 1])?.parse::<f32>()?;
 
     let mut headerHashMap: HashMap<String, String> = HashMap::new();
 
@@ -86,18 +62,13 @@ pub fn parseHTTPConnection(
             findSubStringWithBytes(headerSupplied.as_slice().to_vec(), b":").unwrap();
 
         let headerName =
-            match str::from_utf8(&headerSupplied[0..headerDoublePeriodLocation as usize]) {
-                Ok(o) => o.to_string(),
-                Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
-            };
+            str::from_utf8(&headerSupplied[0..headerDoublePeriodLocation as usize])?.to_string();
 
-        match str::from_utf8(
+        let headerContent = str::from_utf8(
             &headerSupplied
                 [headerDoublePeriodLocation as usize + 2..headerCLRFLocationGet as usize],
-        ) {
-            Ok(o) => headerHashMap.insert(headerName, o.to_string()),
-            Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
-        };
+        )?;
+        headerHashMap.insert(headerName, headerContent.to_string());
 
         connectionData.drain(0..headerCLRFLocationDrain);
     }

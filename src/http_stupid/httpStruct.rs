@@ -66,7 +66,7 @@ impl HttpResponseStruct {
     }
 
     pub fn setBody(&mut self, body: String) {
-        self.body.extend_from_slice(format!("{}", body).as_bytes())
+        self.body.extend_from_slice(body.as_bytes())
     }
 
     pub fn addDefaultHeaders(&mut self) {

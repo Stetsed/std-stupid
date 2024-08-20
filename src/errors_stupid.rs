@@ -1,24 +1,25 @@
 use core::fmt;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::num::ParseFloatError;
 use std::str::Utf8Error;
 
 #[derive(Debug)]
-pub struct intValueError {
+pub struct IntValueError {
     pub source: String,
 }
 
-impl intValueError {
+impl IntValueError {
     pub fn new<T: Into<String>>(source: T) -> Self {
-        intValueError {
+        IntValueError {
             source: source.into(),
         }
     }
 }
 
-impl Error for intValueError {}
+impl Error for IntValueError {}
 
-impl Display for intValueError {
+impl Display for IntValueError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "intValueError")
     }
@@ -46,21 +47,21 @@ impl Display for HttpServerError {
 }
 
 #[derive(Debug)]
-pub struct subStringError {
+pub struct SubStringError {
     pub source: String,
 }
 
-impl Error for subStringError {}
+impl Error for SubStringError {}
 
-impl Display for subStringError {
+impl Display for SubStringError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "HttpServerError")
     }
 }
 
-impl subStringError {
+impl SubStringError {
     pub fn new<T: Into<String>>(source: T) -> Self {
-        subStringError {
+        SubStringError {
             source: source.into(),
         }
     }
@@ -68,17 +69,48 @@ impl subStringError {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub enum HttpReturnError {
-    HttpServerError(crate::HttpServerError),
-    IntValueError(crate::intValueError),
-    SubStringError(crate::subStringError),
-    Utf8ParsingError(std::str::Utf8Error),
+pub enum StdStupidError {
+    HttpServer(HttpServerError),
+    IntValue(IntValueError),
+    SubString(SubStringError),
+    Utf8Parsing(std::str::Utf8Error),
+    ParseFloat(std::num::ParseFloatError),
 }
 
-impl Error for HttpReturnError {}
+impl Error for StdStupidError {}
 
-impl Display for HttpReturnError {
+impl Display for StdStupidError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Httpreturn")
+        write!(f, "stdStupidError")
+    }
+}
+
+impl From<HttpServerError> for StdStupidError {
+    fn from(error: HttpServerError) -> Self {
+        Self::HttpServer(error)
+    }
+}
+
+impl From<IntValueError> for StdStupidError {
+    fn from(error: IntValueError) -> Self {
+        Self::IntValue(error)
+    }
+}
+
+impl From<SubStringError> for StdStupidError {
+    fn from(error: SubStringError) -> Self {
+        Self::SubString(error)
+    }
+}
+
+impl From<Utf8Error> for StdStupidError {
+    fn from(error: Utf8Error) -> Self {
+        Self::Utf8Parsing(error)
+    }
+}
+
+impl From<ParseFloatError> for StdStupidError {
+    fn from(error: ParseFloatError) -> Self {
+        Self::ParseFloat(error)
     }
 }

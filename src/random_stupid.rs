@@ -5,31 +5,25 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::{prelude::*, Error};
 
-mod random_stupid {}
-
 #[derive(Debug)]
-pub struct randomNumberGenerator {
+pub struct RandomNumberGenerator {
     pub seed: u64,
     pub latestNumber: u64,
     randFileDescriptor: File,
 }
 
-impl error::Error for randomNumberGenerator {}
+impl error::Error for RandomNumberGenerator {}
 
-impl Display for randomNumberGenerator {
+impl Display for RandomNumberGenerator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Error ya wank")
     }
 }
 
-impl randomNumberGenerator {
+impl RandomNumberGenerator {
     pub fn getRandomNumber(mut self) -> u64 {
         let mut buffer: [u8; 8] = [0; 8];
-        let random_garbage = self
-            .randFileDescriptor
-            .read(&mut buffer)
-            .unwrap()
-            .to_string();
+        self.randFileDescriptor.read_exact(&mut buffer);
 
         let mut final_spit: u64 = 0;
 
@@ -38,12 +32,12 @@ impl randomNumberGenerator {
         }
 
         self.latestNumber = final_spit;
-        return final_spit;
+        final_spit
     }
-    pub fn new() -> Result<randomNumberGenerator, Error> {
+    pub fn new() -> Result<Self, Error> {
         let randFileDescriptor = File::open("/dev/urandom")?;
 
-        Ok(randomNumberGenerator {
+        Ok(RandomNumberGenerator {
             seed: 0,
             latestNumber: 0,
             randFileDescriptor,

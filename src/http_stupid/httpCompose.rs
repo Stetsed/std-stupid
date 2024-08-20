@@ -12,7 +12,7 @@ use std::{
 
 use crate::{
     errors_stupid::HttpServerError, findSubStringWithString, httpStruct::*, http_stupid::*,
-    standard_stupid::findSubStringWithBytes, HttpReturnError,
+    standard_stupid::findSubStringWithBytes,
 };
 
 pub fn composeHttpResponse(

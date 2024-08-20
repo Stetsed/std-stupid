@@ -23,18 +23,16 @@ use http_stupid::*;
 use random_stupid::*;
 use standard_stupid::*;
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), StdStupidError> {
     let IpAddressToUse: String = "127.0.0.1".to_string();
     let portTouse: u16 = 9182;
 
-    let mut HttpServer = match HttpServer::new(
+    let mut HttpServer = HttpServer::new(
         ServerFunction::ServeFile,
         Some(IpAddressToUse),
         Some(portTouse),
-    ) {
-        Ok(o) => o,
-        Err(e) => panic!("{e:?}"),
-    };
+    )?;
+
     HttpServer.setupListener();
 
     HttpServer.startListening();

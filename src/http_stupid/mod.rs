@@ -11,7 +11,7 @@ use std::{
 
 use crate::{
     composeHttpResponse, errors_stupid::HttpServerError, findSubStringWithString, httpParser::*,
-    httpStruct::*, standard_stupid::findSubStringWithBytes,
+    httpStruct::*, standard_stupid::findSubStringWithBytes, StdStupidError,
 };
 
 #[derive(Debug)]
@@ -31,7 +31,7 @@ impl HttpServer {
         ServerFunctionType: ServerFunction,
         IpAddressGiven: Option<String>,
         PortGiven: Option<u16>,
-    ) -> Result<Self, HttpServerError> {
+    ) -> Result<Self, StdStupidError> {
         // Attempt to get port given, if not given then use default port 8080.
         let PortToUse: u16 = PortGiven.unwrap_or(8080);
 
@@ -42,14 +42,14 @@ impl HttpServer {
 
         // Checks if the address is multicast/Documentation range, if yes rejects.
         if IpAddressToUse.is_multicast() {
-            return Err::<Self, HttpServerError>(HttpServerError {
-                source: String::from("IP Address Given is designated as Multicast"),
-            });
+            Into::<StdStupidError>::into(HttpServerError::new(
+                "IP Address Given is designated as Multicast",
+            ));
         }
         if IpAddressToUse.is_documentation() {
-            return Err::<Self, HttpServerError>(HttpServerError {
-                source: String::from("IP Address Given is designated as Documentation IP range."),
-            });
+            Into::<StdStupidError>::into(HttpServerError::new(
+                "IP Address Given is designated as Documentation IP range.",
+            ));
         }
 
         Ok(Self {
@@ -73,7 +73,7 @@ impl HttpServer {
         }
     }
 
-    pub fn startListening(&mut self) {
+    pub fn startListening(&mut self) -> Result<(), StdStupidError> {
         for stream in self.TcpListener.as_ref().unwrap().incoming() {
             match stream {
                 Ok(mut o) => {
@@ -81,10 +81,7 @@ impl HttpServer {
 
                     let recieveBuffer = reader.fill_buf().unwrap().to_vec();
 
-                    let data = match parseHTTPConnection(recieveBuffer) {
-                        Ok(o) => o,
-                        Err(e) => panic!("Yo {:?}", e),
-                    };
+                    let data = parseHTTPConnection(recieveBuffer)?;
 
                     o.write_all(composeHttpResponse(self.GetServerFunction(), data).as_slice());
                 }
@@ -94,6 +91,7 @@ impl HttpServer {
                 Err(e) => panic!("Something went very wrong... {:?}", e),
             }
         }
+        Ok(())
     }
 
     pub fn GetServerFunction(&self) -> ServerFunction {
