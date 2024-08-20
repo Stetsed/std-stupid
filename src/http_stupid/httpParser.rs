@@ -10,7 +10,7 @@ use std::{
 };
 
 use crate::{
-    errors_stupid::HttpServerError, findSubStringWithString, http::*, httpStruct::*,
+    errors_stupid::HttpServerError, findSubStringWithString, httpStruct::*, http_stupid::*,
     standard_stupid::findSubStringWithBytes, HttpReturnError,
 };
 
@@ -27,22 +27,12 @@ pub fn parseHTTPConnection(
         }
     };
 
-    let snip = match str::from_utf8(&connectionData[0..MethodLocation as usize - 1]) {
+    let RequestTypeRaw = match str::from_utf8(&connectionData[0..MethodLocation as usize - 1]) {
         Ok(o) => o,
         Err(e) => return Err(HttpReturnError::Utf8ParsingError(e)),
     };
 
-    let RequestTypeGiven: RequestType = match snip {
-        "GET" => RequestType::GET,
-        "POST" => RequestType::POST,
-        "HEAD" => RequestType::HEAD,
-        "PUT" => RequestType::PUT,
-        "CONNECT" => RequestType::CONNECT,
-        "DELETE" => RequestType::DELETE,
-        "TRACE" => RequestType::TRACE,
-        "OPTIONS" => RequestType::OPTIONS,
-        _ => RequestType::INVALID,
-    };
+    let HttpRequestTypeGiven: HttpRequestType = parseHttpRequestType(RequestTypeRaw);
 
     connectionData.drain(0..MethodLocation as usize);
 
@@ -74,9 +64,9 @@ pub fn parseHTTPConnection(
 
     let mut headerHashMap: HashMap<String, String> = HashMap::new();
 
-    connectionData.drain(0..RequestPathLocation as usize + 1);
+    connectionData.drain(0..HTTPlocation as usize + 1);
 
-    while connectionData.len() >= 3 {
+    while connectionData.len() > 2 {
         let headerCLRFLocation =
             findSubStringWithBytes(connectionData.clone(), &[0x0a]).unwrap_or(0);
 
@@ -93,7 +83,7 @@ pub fn parseHTTPConnection(
         let headerSupplied = connectionData[0..headerCLRFLocationGet as usize].to_vec();
 
         let headerDoublePeriodLocation =
-            findSubStringWithBytes(headerSupplied.as_slice().to_vec(), &[0x3a]).unwrap();
+            findSubStringWithBytes(headerSupplied.as_slice().to_vec(), b":").unwrap();
 
         let headerName =
             match str::from_utf8(&headerSupplied[0..headerDoublePeriodLocation as usize]) {
@@ -118,15 +108,29 @@ pub fn parseHTTPConnection(
     #[cfg(debug_assertions)]
     println!("Request path found is: {:?}", requestPathGiven);
     #[cfg(debug_assertions)]
-    println!("Request type found is: {:?}", RequestTypeGiven);
+    println!("Request type found is: {:?}", HttpRequestTypeGiven);
     #[cfg(debug_assertions)]
     for (header, content) in &headerHashMap {
         println!("Header: {header} : {content}");
     }
     Ok(ParseReturnData {
         httpVersion: HTTPVersionGiven,
-        RequestType: RequestTypeGiven,
+        HttpRequestType: HttpRequestTypeGiven,
         requestPath: requestPathGiven,
         headers: headerHashMap,
     })
+}
+
+pub fn parseHttpRequestType<T: AsRef<str>>(toParse: T) -> HttpRequestType {
+    match toParse.as_ref() {
+        "GET" => HttpRequestType::GET,
+        "POST" => HttpRequestType::POST,
+        "HEAD" => HttpRequestType::HEAD,
+        "PUT" => HttpRequestType::PUT,
+        "CONNECT" => HttpRequestType::CONNECT,
+        "DELETE" => HttpRequestType::DELETE,
+        "TRACE" => HttpRequestType::TRACE,
+        "OPTIONS" => HttpRequestType::OPTIONS,
+        _ => HttpRequestType::INVALID,
+    }
 }

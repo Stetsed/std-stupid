@@ -3,23 +3,23 @@ use std::{
     collections::HashMap,
     error::Error,
     fmt::Debug,
-    io::{self, BufWriter, Write},
+    io::{self, prelude::*, BufReader, BufWriter, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
     str,
     time::SystemTime,
 };
 
 use crate::{
-    errors_stupid::HttpServerError, findSubStringWithString, httpParser::*, httpStruct::*,
-    standard_stupid::findSubStringWithBytes,
+    composeHttpResponse, errors_stupid::HttpServerError, findSubStringWithString, httpParser::*,
+    httpStruct::*, standard_stupid::findSubStringWithBytes,
 };
 
 #[derive(Debug)]
 pub struct HttpServer {
     ListeningAddress: Ipv4Addr,
     ServerFunction: ServerFunction,
-    pub TcpListener: Option<TcpListener>,
     Port: u16,
+    TcpListener: Option<TcpListener>,
 }
 
 pub mod httpCompose;
@@ -28,11 +28,10 @@ pub mod httpStruct;
 
 impl HttpServer {
     pub fn new(
+        ServerFunctionType: ServerFunction,
         IpAddressGiven: Option<String>,
         PortGiven: Option<u16>,
     ) -> Result<Self, HttpServerError> {
-        let ServerFunctionType: ServerFunction = ServerFunction::Debug;
-
         // Attempt to get port given, if not given then use default port 8080.
         let PortToUse: u16 = PortGiven.unwrap_or(8080);
 
@@ -74,16 +73,38 @@ impl HttpServer {
         }
     }
 
-    pub fn acceptConnection(&mut self) -> Result<(TcpStream, SocketAddr), HttpServerError> {
-        let TcpConnection = self.TcpListener.as_ref().unwrap().accept();
+    pub fn startListening(&mut self) {
+        for stream in self.TcpListener.as_ref().unwrap().incoming() {
+            match stream {
+                Ok(mut o) => {
+                    let mut reader = BufReader::new(&o);
 
-        match TcpConnection {
-            Ok(v) => Ok(v),
-            Err(e) => panic!("{e:?}"),
+                    let recieveBuffer = reader.fill_buf().unwrap().to_vec();
+
+                    let data = match parseHTTPConnection(recieveBuffer) {
+                        Ok(o) => o,
+                        Err(e) => panic!("Yo {:?}", e),
+                    };
+
+                    o.write_all(composeHttpResponse(self.GetServerFunction(), data).as_slice());
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    continue;
+                }
+                Err(e) => panic!("Something went very wrong... {:?}", e),
+            }
         }
     }
 
     pub fn GetServerFunction(&self) -> ServerFunction {
         self.ServerFunction
+    }
+
+    pub fn getServerPort(&self) -> u16 {
+        self.Port
+    }
+
+    pub fn getServerIP(&self) -> Ipv4Addr {
+        self.ListeningAddress
     }
 }

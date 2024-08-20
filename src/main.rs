@@ -1,7 +1,7 @@
 #![feature(addr_parse_ascii, ip, tcplistener_into_incoming)]
 #![allow(non_snake_case, unused_imports, unused_must_use)]
 mod errors_stupid;
-mod http;
+mod http_stupid;
 mod random_stupid;
 mod standard_stupid;
 
@@ -16,9 +16,10 @@ use std::time::Duration;
 use std::{error, io};
 
 use errors_stupid::*;
-use http::*;
-use httpParser::*;
-use httpStruct::*;
+use http_stupid::httpCompose::*;
+use http_stupid::httpParser::*;
+use http_stupid::httpStruct::*;
+use http_stupid::*;
 use random_stupid::*;
 use standard_stupid::*;
 
@@ -26,32 +27,17 @@ fn main() -> Result<(), Error> {
     let IpAddressToUse: String = "127.0.0.1".to_string();
     let portTouse: u16 = 9182;
 
-    let mut HttpServer = match HttpServer::new(Some(IpAddressToUse), Some(portTouse)) {
+    let mut HttpServer = match HttpServer::new(
+        ServerFunction::ServeFile,
+        Some(IpAddressToUse),
+        Some(portTouse),
+    ) {
         Ok(o) => o,
         Err(e) => panic!("{e:?}"),
     };
     HttpServer.setupListener();
 
-    for stream in HttpServer.TcpListener.as_ref().unwrap().incoming() {
-        match stream {
-            Ok(mut o) => {
-                let mut reader = BufReader::new(&o);
-
-                let recieveBuffer = reader.fill_buf().unwrap().to_vec();
-
-                let data = match parseHTTPConnection(recieveBuffer) {
-                    Ok(o) => o,
-                    Err(e) => panic!("Yo {:?}", e),
-                };
-
-                o.write_all(composeHttpResponse(HttpServer.GetServerFunction(), data).as_slice());
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                continue;
-            }
-            Err(e) => panic!("wtf {:?}", e),
-        }
-    }
+    HttpServer.startListening();
 
     Ok(())
 }

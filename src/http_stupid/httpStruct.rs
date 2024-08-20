@@ -6,8 +6,8 @@ pub enum connectionReturn {
     SocketAddr,
 }
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Debug)]
-pub enum RequestType {
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum HttpRequestType {
     GET,
     POST,
     OPTIONS,
@@ -27,10 +27,10 @@ pub enum ServerFunction {
     Proxy,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParseReturnData {
     pub httpVersion: f32,
-    pub RequestType: RequestType,
+    pub HttpRequestType: HttpRequestType,
     pub requestPath: String,
     pub headers: HashMap<String, String>,
 }
@@ -60,13 +60,37 @@ impl HttpResponseStruct {
             .as_bytes(),
         )
     }
-    pub fn addHeader(&mut self, header: String) {
+    pub fn addHeader<T: AsRef<str>>(&mut self, header: T) {
         self.headers
-            .extend_from_slice(format!("{}\r\n", header).as_bytes())
+            .extend_from_slice(format!("{}\r\n", header.as_ref()).as_bytes())
     }
 
     pub fn setBody(&mut self, body: String) {
         self.body.extend_from_slice(format!("{}", body).as_bytes())
+    }
+
+    pub fn addDefaultHeaders(&mut self) {
+        self.addHeader("Server: std-stupid-http");
+        self.addHeader("Content-Type: text/html");
+        self.addHeader("Accept-Ranges: bytes");
+        self.addHeader("Connection: close");
+        self.addHeader("Cache-Control: no-cache");
+    }
+
+    pub fn getResponse(&mut self) -> Vec<u8> {
+        let mut responseVec: Vec<u8> = Vec::new();
+
+        responseVec.append(&mut self.status);
+
+        self.addHeader(format!("Content-Length: {}\r\n", self.body.len() + 2));
+
+        responseVec.append(&mut self.headers);
+
+        responseVec.extend_from_slice(b"\r\n");
+
+        responseVec.append(&mut self.body);
+
+        responseVec
     }
 }
 
