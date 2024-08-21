@@ -1,8 +1,6 @@
 pub mod standard {}
 
-use std::{error::Error, io::Read};
-
-use crate::errors_stupid::{self, *};
+use crate::errors_stupid::*;
 
 #[allow(dead_code)]
 pub fn mapRange(
@@ -13,7 +11,7 @@ pub fn mapRange(
     value: i64,
 ) -> Result<i64, StdStupidError> {
     if min_in > value || max_in < value {
-        Into::<StdStupidError>::into(IntValueError::new("Value out of bounds of input"));
+        let _ = Into::<StdStupidError>::into(IntValueError::new("Value out of bounds of input"));
     }
 
     let calculate_range_differential: f64 =

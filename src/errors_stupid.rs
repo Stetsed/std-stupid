@@ -1,6 +1,6 @@
 use core::fmt;
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::num::ParseFloatError;
 use std::str::Utf8Error;
 
@@ -75,6 +75,7 @@ pub enum StdStupidError {
     SubString(SubStringError),
     Utf8Parsing(std::str::Utf8Error),
     ParseFloat(std::num::ParseFloatError),
+    StdIO(std::io::Error),
 }
 
 impl Error for StdStupidError {}
@@ -112,5 +113,11 @@ impl From<Utf8Error> for StdStupidError {
 impl From<ParseFloatError> for StdStupidError {
     fn from(error: ParseFloatError) -> Self {
         Self::ParseFloat(error)
+    }
+}
+
+impl From<std::io::Error> for StdStupidError {
+    fn from(error: std::io::Error) -> Self {
+        Self::StdIO(error)
     }
 }

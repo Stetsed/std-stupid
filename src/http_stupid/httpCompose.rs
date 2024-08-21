@@ -1,19 +1,6 @@
-use std::{
-    borrow::Borrow,
-    collections::HashMap,
-    error::Error,
-    fmt::Debug,
-    fs,
-    io::{self, BufWriter, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
-    str,
-    time::SystemTime,
-};
+use std::{fs, str};
 
-use crate::{
-    errors_stupid::HttpServerError, findSubStringWithString, httpStruct::*, http_stupid::*,
-    standard_stupid::findSubStringWithBytes,
-};
+use crate::http_stupid::*;
 
 pub fn composeHttpResponse(
     HttpServerFunction: ServerFunction,

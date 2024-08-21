@@ -1,17 +1,12 @@
 use std::{
-    borrow::Borrow,
-    collections::HashMap,
-    error::Error,
     fmt::Debug,
-    io::{self, prelude::*, BufReader, BufWriter, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
-    str,
-    time::SystemTime,
+    io::{self, prelude::*, BufReader, Write},
+    net::{Ipv4Addr, SocketAddrV4, TcpListener},
 };
 
 use crate::{
-    composeHttpResponse, errors_stupid::HttpServerError, findSubStringWithString, httpParser::*,
-    httpStruct::*, standard_stupid::findSubStringWithBytes, StdStupidError,
+    composeHttpResponse, errors_stupid::HttpServerError, httpParser::*, httpStruct::*,
+    StdStupidError,
 };
 
 #[derive(Debug)]
@@ -42,12 +37,12 @@ impl HttpServer {
 
         // Checks if the address is multicast/Documentation range, if yes rejects.
         if IpAddressToUse.is_multicast() {
-            Into::<StdStupidError>::into(HttpServerError::new(
+            let _ = Into::<StdStupidError>::into(HttpServerError::new(
                 "IP Address Given is designated as Multicast",
             ));
         }
         if IpAddressToUse.is_documentation() {
-            Into::<StdStupidError>::into(HttpServerError::new(
+            let _ = Into::<StdStupidError>::into(HttpServerError::new(
                 "IP Address Given is designated as Documentation IP range.",
             ));
         }
@@ -60,14 +55,15 @@ impl HttpServer {
         })
     }
 
-    pub fn setupListener(&mut self) {
+    pub fn setupListener(&mut self) -> Result<(), StdStupidError> {
         let socketAddress: SocketAddrV4 = SocketAddrV4::new(self.ListeningAddress, self.Port);
         let listenerReturn = TcpListener::bind(socketAddress);
 
         match listenerReturn {
             Ok(o) => {
-                o.set_nonblocking(true);
-                self.TcpListener = Some(o)
+                o.set_nonblocking(true)?;
+                self.TcpListener = Some(o);
+                Ok(())
             }
             Err(e) => panic!("{e:?}"),
         }
@@ -83,7 +79,7 @@ impl HttpServer {
 
                     let data = parseHTTPConnection(recieveBuffer)?;
 
-                    o.write_all(composeHttpResponse(self.GetServerFunction(), data).as_slice());
+                    o.write_all(composeHttpResponse(self.GetServerFunction(), data).as_slice())?;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     continue;

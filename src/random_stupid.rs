@@ -1,14 +1,15 @@
 use core::fmt;
-use std::default::Default;
 use std::error;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{prelude::*, Error};
 
+use crate::StdStupidError;
+
 #[derive(Debug)]
 pub struct RandomNumberGenerator {
-    pub seed: u64,
-    pub latestNumber: u64,
+    seed: u64,
+    latestNumber: u64,
     randFileDescriptor: File,
 }
 
@@ -21,9 +22,9 @@ impl Display for RandomNumberGenerator {
 }
 
 impl RandomNumberGenerator {
-    pub fn getRandomNumber(mut self) -> u64 {
+    pub fn getRandomNumber(mut self) -> Result<u64, StdStupidError> {
         let mut buffer: [u8; 8] = [0; 8];
-        self.randFileDescriptor.read_exact(&mut buffer);
+        self.randFileDescriptor.read_exact(&mut buffer)?;
 
         let mut final_spit: u64 = 0;
 
@@ -32,7 +33,7 @@ impl RandomNumberGenerator {
         }
 
         self.latestNumber = final_spit;
-        final_spit
+        Ok(final_spit)
     }
     pub fn new() -> Result<Self, Error> {
         let randFileDescriptor = File::open("/dev/urandom")?;
