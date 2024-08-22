@@ -4,10 +4,10 @@ use std::{
     net::{Ipv4Addr, SocketAddrV4, TcpListener},
 };
 
-use crate::{
-    composeHttpResponse, errors_stupid::HttpServerError, httpParser::*, httpStruct::*,
-    StdStupidError,
-};
+use crate::{httpCompose::composeHttpResponse, httpParser::*, httpStruct::*};
+
+use errors_stupid::HttpServerError;
+use errors_stupid::StdStupidError;
 
 #[derive(Debug)]
 pub struct HttpServer {

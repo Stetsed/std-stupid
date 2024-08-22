@@ -1,6 +1,6 @@
 pub mod standard {}
 
-use crate::errors_stupid::*;
+use errors_stupid::*;
 
 #[allow(dead_code)]
 pub fn mapRange(

@@ -1,0 +1,8 @@
+[package]
+name = "http_stupid"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+errors_stupid = { path = "../errors_stupid/" }
+standard_stupid = { path = "../standard_stupid/" }

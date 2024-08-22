@@ -1,6 +1,6 @@
 use std::{fs, str};
 
-use crate::http_stupid::*;
+use crate::*;
 
 pub fn composeHttpResponse(
     HttpServerFunction: ServerFunction,

@@ -1,6 +1,8 @@
 use std::{collections::HashMap, str};
 
-use crate::{http_stupid::*, standard_stupid::findSubStringWithBytes};
+use crate::*;
+use errors_stupid::StdStupidError;
+use standard_stupid::findSubStringWithBytes;
 
 pub fn parseHTTPConnection(mut connectionData: Vec<u8>) -> Result<ParseReturnData, StdStupidError> {
     // Find the / to find the method being used

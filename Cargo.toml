@@ -6,3 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+http_stupid = { path = "./http_stupid" }
+errors_stupid = { path = "./errors_stupid/" }
+standard_stupid = { path = "./standard_stupid/" }
+
+[workspace]
+
+members = ["http_stupid", "errors_stupid", "standard_stupid"]
