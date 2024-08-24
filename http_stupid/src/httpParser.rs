@@ -4,86 +4,94 @@ use crate::*;
 use errors_stupid::StdStupidError;
 use standard_stupid::findSubStringWithBytes;
 
-pub fn parseHTTPConnection(mut connectionData: Vec<u8>) -> Result<ParseReturnData, StdStupidError> {
+/// Takes an argument of `Vec<u8>` with the data contained being that from a buffered reader on a
+/// TCPListerner and returns the data contained within including the httpVersion used, the type of request that was recieved, the path that was requested,
+/// and lastly a hash map of all the headers in a <String, String> format where the key is the
+/// header name and the content is the headers content inside of the Struct of [`httpStruct::ParseReturnData`]
+pub fn parse_http_connection(
+    mut connection_data: Vec<u8>,
+) -> Result<ParseReturnData, StdStupidError> {
     // Find the / to find the method being used
-    let MethodLocation = findSubStringWithBytes(connectionData.clone(), b"/")?;
+    let method_location = findSubStringWithBytes(connection_data.as_slice(), b"/")?;
 
-    let RequestTypeRaw = str::from_utf8(&connectionData[0..MethodLocation as usize - 1])?;
+    let request_type_raw = str::from_utf8(&connection_data[0..method_location as usize - 1])?;
 
-    let HttpRequestTypeGiven: HttpRequestType = parseHttpRequestType(RequestTypeRaw);
+    let http_request_type_given: HttpRequestType = parseHttpRequestType(request_type_raw);
 
-    connectionData.drain(0..MethodLocation as usize);
+    connection_data.drain(0..method_location as usize);
 
     // Find the H to know the entire path
-    let RequestPathLocation = findSubStringWithBytes(connectionData.clone(), &[0x48])?;
+    let request_path_location = findSubStringWithBytes(connection_data.as_slice(), &[0x48])?;
 
-    let requestPathGiven: String =
-        str::from_utf8(&connectionData[0..RequestPathLocation as usize - 1])?.to_string();
+    let request_path_given: String =
+        str::from_utf8(&connection_data[0..request_path_location as usize - 1])?.to_string();
 
-    connectionData.drain(0..RequestPathLocation as usize);
+    connection_data.drain(0..request_path_location as usize);
 
     // Find the first CLRF
-    let HTTPlocation = findSubStringWithBytes(connectionData.clone(), &[0x0a])?;
+    let http_location = findSubStringWithBytes(connection_data.as_slice(), &[0x0a])?;
 
-    let HTTPVersionGiven: f32 =
-        str::from_utf8(&connectionData[5..HTTPlocation as usize - 1])?.parse::<f32>()?;
+    let http_version_given: f32 =
+        str::from_utf8(&connection_data[5..http_location as usize - 1])?.parse::<f32>()?;
 
-    let mut headerHashMap: HashMap<String, String> = HashMap::new();
+    let mut header_hash_map: HashMap<String, String> = HashMap::new();
 
-    connectionData.drain(0..HTTPlocation as usize + 1);
+    connection_data.drain(0..http_location as usize + 1);
 
-    while connectionData.len() > 2 {
-        let headerCLRFLocation =
-            findSubStringWithBytes(connectionData.clone(), &[0x0a]).unwrap_or(0);
+    while connection_data.len() > 2 {
+        let header_clrf_location =
+            findSubStringWithBytes(connection_data.as_slice(), &[0x0a]).unwrap_or(0);
 
-        let headerCLRFLocationGet: u32;
-        let headerCLRFLocationDrain: usize;
+        let header_clrf_location_get: u32;
+        let header_clrf_location_drain: usize;
 
-        if headerCLRFLocation == 0 {
-            headerCLRFLocationGet = connectionData.len() as u32;
-            headerCLRFLocationDrain = connectionData.len();
+        if header_clrf_location == 0 {
+            header_clrf_location_get = connection_data.len() as u32;
+            header_clrf_location_drain = connection_data.len();
         } else {
-            headerCLRFLocationGet = headerCLRFLocation - 1;
-            headerCLRFLocationDrain = (headerCLRFLocation + 1) as usize;
+            header_clrf_location_get = header_clrf_location - 1;
+            header_clrf_location_drain = (header_clrf_location + 1) as usize;
         }
-        let headerSupplied = connectionData[0..headerCLRFLocationGet as usize].to_vec();
+        let header_supplied = connection_data[0..header_clrf_location_get as usize].to_vec();
 
-        let headerDoublePeriodLocation =
-            findSubStringWithBytes(headerSupplied.as_slice().to_vec(), b":").unwrap();
+        let header_double_period_location =
+            findSubStringWithBytes(header_supplied.as_slice(), b":").unwrap();
 
-        let headerName =
-            str::from_utf8(&headerSupplied[0..headerDoublePeriodLocation as usize])?.to_string();
+        let header_name =
+            str::from_utf8(&header_supplied[0..header_double_period_location as usize])?
+                .to_string();
 
-        let headerContent = str::from_utf8(
-            &headerSupplied
-                [headerDoublePeriodLocation as usize + 2..headerCLRFLocationGet as usize],
-        )?;
-        headerHashMap.insert(headerName, headerContent.to_string());
+        let header_content = str::from_utf8(
+            &header_supplied
+                [header_double_period_location as usize + 2..header_clrf_location as usize],
+        )?
+        .to_string();
+        header_hash_map.insert(header_name, header_content);
 
-        connectionData.drain(0..headerCLRFLocationDrain);
+        connection_data.drain(0..header_clrf_location_drain);
     }
 
-    drop(connectionData);
+    drop(connection_data);
     #[cfg(debug_assertions)]
-    println!("HTTP Version found is: {:?}", HTTPVersionGiven);
+    println!("HTTP Version found is: {:?}", http_version_given);
     #[cfg(debug_assertions)]
-    println!("Request path found is: {:?}", requestPathGiven);
+    println!("Request path found is: {:?}", request_path_given);
     #[cfg(debug_assertions)]
-    println!("Request type found is: {:?}", HttpRequestTypeGiven);
+    println!("Request type found is: {:?}", http_request_type_given);
     #[cfg(debug_assertions)]
-    for (header, content) in &headerHashMap {
+    for (header, content) in &header_hash_map {
         println!("Header: {header} : {content}");
     }
     Ok(ParseReturnData {
-        httpVersion: HTTPVersionGiven,
-        HttpRequestType: HttpRequestTypeGiven,
-        requestPath: requestPathGiven,
-        headers: headerHashMap,
+        httpVersion: http_version_given,
+        HttpRequestType: http_request_type_given,
+        requestPath: request_path_given,
+        headers: header_hash_map,
     })
 }
 
-pub fn parseHttpRequestType<T: AsRef<str>>(toParse: T) -> HttpRequestType {
-    match toParse.as_ref() {
+pub fn parseHttpRequestType<T: AsRef<str>>(to_parse: T) -> HttpRequestType {
+    match to_parse.as_ref() {
         "GET" => HttpRequestType::GET,
         "POST" => HttpRequestType::POST,
         "HEAD" => HttpRequestType::HEAD,

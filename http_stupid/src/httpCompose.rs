@@ -2,6 +2,11 @@ use std::{fs, str};
 
 use crate::*;
 
+/// Takes in the HTTP's server function and the parsed data from
+/// [`httpParser::parse_http_connection()`], and depending on the server type either spits out the
+/// headers made in the request when ServerFunction is Debug, or gets the file requested if
+/// ServerFunction is ServeFile, if function is ServeFile also makes sure it is not attempting to
+/// do a file path escape.
 pub fn composeHttpResponse(
     HttpServerFunction: ServerFunction,
     parseReturnData: ParseReturnData,
@@ -71,7 +76,10 @@ pub fn composeHttpResponse(
     }
 }
 
-fn addHeader<T: AsRef<str>>(header: T, mut vector: Vec<u8>) -> Vec<u8> {
+/// Takes in the header as a Generic of a ref type of string, and converts it to bytes and appends
+/// it to the vector given and returns the vector which has the header applied to the Vector of
+/// bytes.
+pub fn addHeader<T: AsRef<str>>(header: T, mut vector: Vec<u8>) -> Vec<u8> {
     vector.extend_from_slice(header.as_ref().as_bytes());
 
     vector

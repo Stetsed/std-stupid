@@ -23,7 +23,7 @@ pub fn mapRange(
 }
 
 #[allow(dead_code)]
-pub fn findSubStringWithString(array: Vec<u8>, subString: String) -> Result<u32, StdStupidError> {
+pub fn findSubStringWithString(array: &[u8], subString: String) -> Result<u32, StdStupidError> {
     let subStringAsBytes: Vec<u8> = b"subString".to_vec();
     let subStringLength = subString.len();
     let mut location: Option<u32> = None;
@@ -46,7 +46,7 @@ pub fn findSubStringWithString(array: Vec<u8>, subString: String) -> Result<u32,
 }
 
 pub fn findSubStringWithBytes(
-    array: Vec<u8>,
+    array: &[u8],
     subStringAsBytes: &[u8],
 ) -> Result<u32, StdStupidError> {
     let subStringLength = subStringAsBytes.len();

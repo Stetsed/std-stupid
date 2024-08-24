@@ -1,6 +1,5 @@
 #![feature(addr_parse_ascii, ip, tcplistener_into_incoming)]
 #![allow(non_snake_case)]
-#![warn(missing_docs)]
 mod random_stupid;
 
 use errors_stupid::*;
