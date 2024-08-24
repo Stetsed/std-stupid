@@ -63,7 +63,7 @@ pub fn parse_http_connection(
 
         let header_content = str::from_utf8(
             &header_supplied
-                [header_double_period_location as usize + 2..header_clrf_location as usize],
+                [header_double_period_location as usize + 2..header_clrf_location as usize - 1],
         )?
         .to_string();
         header_hash_map.insert(header_name, header_content);

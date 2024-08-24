@@ -8,6 +8,7 @@ use crate::{httpCompose::composeHttpResponse, httpParser::*, httpStruct::*};
 
 use errors_stupid::HttpServerError;
 use errors_stupid::StdStupidError;
+use httpCompose::compose_server_error;
 
 /// Struct that is used to define our HTTP server, given a Function, an optional IP and an optional
 /// port, and if not given will run by default on 127.0.0.1:8080. And has functions to start using
@@ -112,9 +113,12 @@ impl HttpServer {
 
                     let recieveBuffer = reader.fill_buf().unwrap().to_vec();
 
-                    let data = parse_http_connection(recieveBuffer)?;
-
-                    o.write_all(composeHttpResponse(self.GetServerFunction(), data).as_slice())?;
+                    match parse_http_connection(recieveBuffer) {
+                        Ok(d) => o.write_all(
+                            composeHttpResponse(self.GetServerFunction(), d).as_slice(),
+                        )?,
+                        Err(_) => o.write_all(compose_server_error().as_slice())?,
+                    };
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     continue;

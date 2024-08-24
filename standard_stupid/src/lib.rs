@@ -50,15 +50,18 @@ pub fn findSubStringWithBytes(
     subStringAsBytes: &[u8],
 ) -> Result<u32, StdStupidError> {
     let subStringLength = subStringAsBytes.len();
+    let arrayLength = array.len();
     let mut location: Option<u32> = None;
 
-    for i in 0..(array.len() - 1) {
-        if array[i] == subStringAsBytes[0] {
-            let compare = array[i..i + subStringLength].to_vec();
+    if subStringLength < array.len() && subStringLength != 0 {
+        for i in 0..(arrayLength - subStringLength) {
+            if array[i] == subStringAsBytes[0] {
+                let compare = array[i..i + subStringLength].to_vec();
 
-            if compare == subStringAsBytes {
-                location = Some(i as u32);
-                break;
+                if compare == subStringAsBytes {
+                    location = Some(i as u32);
+                    break;
+                }
             }
         }
     }

@@ -1,6 +1,11 @@
-use std::{fs, str};
+use std::{
+    fs::{self, File},
+    str,
+};
 
 use crate::*;
+
+const DISALLOWED_PATTERNS: [&str; 2] = ["..", "./"];
 
 /// Takes in the HTTP's server function and the parsed data from
 /// [`httpParser::parse_http_connection()`], and depending on the server type either spits out the
@@ -43,24 +48,47 @@ pub fn composeHttpResponse(
 
             response.getResponse()
         } else {
-            let path = &parseReturnData.requestPath[1..];
+            let document_root = "./";
 
-            let contains_prohibited = path.contains("/");
+            let mut path = document_root.to_string();
+
+            let path_given = &parseReturnData.requestPath[1..];
+
+            let mut contains_prohibited = false;
+
+            for i in DISALLOWED_PATTERNS {
+                if path_given.contains(i) {
+                    contains_prohibited = true;
+                }
+            }
+
+            path.push_str(path_given);
+
+            #[cfg(debug_assertions)]
+            println!("Path: {}", path);
 
             if contains_prohibited {
                 let mut response: HttpResponseStruct = HttpResponseStruct::new();
 
                 response.addDefaultHeaders();
 
-                response.setStatus(400);
+                response.setStatus(403);
 
                 response.getResponse()
             } else {
                 let mut response: HttpResponseStruct = HttpResponseStruct::new();
 
-                match fs::read_to_string(path) {
-                    Ok(o) => {
-                        response.setBody(o);
+                let mut file = File::open(path).unwrap();
+
+                let mut buf_reader: BufReader<File> = BufReader::new(file);
+
+                let mut buffer: String = String::new();
+
+                let read_status = buf_reader.read_to_string(&mut buffer);
+
+                match read_status {
+                    Ok(_) => {
+                        response.setBody(buffer);
                         response.setStatus(200);
                     }
                     Err(_) => response.setStatus(404),
@@ -74,6 +102,17 @@ pub fn composeHttpResponse(
     } else {
         todo!()
     }
+}
+
+/// Composer designed to just return the most barebones that is needed to return a server error.
+pub fn compose_server_error() -> Vec<u8> {
+    let mut HttpResponseStruct = HttpResponseStruct::new();
+
+    HttpResponseStruct.setStatus(500);
+
+    HttpResponseStruct.addDefaultHeaders();
+
+    HttpResponseStruct.getResponse()
 }
 
 /// Takes in the header as a Generic of a ref type of string, and converts it to bytes and appends

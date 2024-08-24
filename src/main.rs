@@ -7,7 +7,7 @@ use http_stupid::httpStruct::*;
 use http_stupid::HttpServer;
 
 fn main() -> Result<(), StdStupidError> {
-    let IpAddressToUse: String = "127.0.0.1".to_string();
+    let IpAddressToUse: String = "0.0.0.0".to_string();
     let portTouse: u16 = 9182;
 
     let mut HttpServer = HttpServer::new(
