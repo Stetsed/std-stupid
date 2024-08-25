@@ -1,0 +1,2 @@
+# Remove everything inside of testing folder from stats
+test/* -linguist-detectable
