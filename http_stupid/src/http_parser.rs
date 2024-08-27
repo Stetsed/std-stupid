@@ -16,7 +16,7 @@ pub fn parse_http_connection(
 
     let request_type_raw = str::from_utf8(&connection_data[0..method_location as usize - 1])?;
 
-    let http_request_type_given: HttpRequestType = parseHttpRequestType(request_type_raw);
+    let http_request_type_given: HttpRequestType = parse_http_request_type(request_type_raw);
 
     connection_data.drain(0..method_location as usize);
 
@@ -90,7 +90,7 @@ pub fn parse_http_connection(
     })
 }
 
-pub fn parseHttpRequestType<T: AsRef<str>>(to_parse: T) -> HttpRequestType {
+fn parse_http_request_type<T: AsRef<str>>(to_parse: T) -> HttpRequestType {
     match to_parse.as_ref() {
         "GET" => HttpRequestType::GET,
         "POST" => HttpRequestType::POST,

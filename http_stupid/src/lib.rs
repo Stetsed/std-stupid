@@ -4,7 +4,7 @@ use std::{
     net::{Ipv4Addr, SocketAddrV4, TcpListener},
 };
 
-use crate::{http_compose::composeHttpResponse, http_parser::*, http_struct::*};
+use crate::{http_compose::compose_http_response, http_parser::*, http_struct::*};
 
 use errors_stupid::HttpServerError;
 use errors_stupid::StdStupidError;
@@ -114,7 +114,7 @@ impl HttpServer {
 
                     match parse_http_connection(recieve_buffer) {
                         Ok(d) => o.write_all(
-                            composeHttpResponse(self.get_server_function(), d).as_slice(),
+                            compose_http_response(self.get_server_function(), d).as_slice(),
                         )?,
                         Err(_) => o.write_all(compose_server_error().as_slice())?,
                     };

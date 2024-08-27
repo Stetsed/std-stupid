@@ -42,6 +42,12 @@ pub struct HttpResponseStruct {
     body: Vec<u8>,
 }
 
+impl Default for HttpResponseStruct {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HttpResponseStruct {
     pub fn new() -> Self {
         HttpResponseStruct {
@@ -78,19 +84,19 @@ impl HttpResponseStruct {
     }
 
     pub fn getResponse(&mut self) -> Vec<u8> {
-        let mut responseVec: Vec<u8> = Vec::new();
+        let mut response_vec: Vec<u8> = Vec::new();
 
-        responseVec.append(&mut self.status);
+        response_vec.append(&mut self.status);
 
         self.addHeader(format!("Content-Length: {}\r\n", self.body.len() + 2));
 
-        responseVec.append(&mut self.headers);
+        response_vec.append(&mut self.headers);
 
-        responseVec.extend_from_slice(b"\r\n");
+        response_vec.extend_from_slice(b"\r\n");
 
-        responseVec.append(&mut self.body);
+        response_vec.append(&mut self.body);
 
-        responseVec
+        response_vec
     }
 }
 
