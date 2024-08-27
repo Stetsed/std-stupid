@@ -9,14 +9,14 @@ const DISALLOWED_PATTERNS: [&str; 2] = ["..", "./"];
 
 /// Takes in the HTTP's server function and the parsed data from
 /// [`httpParser::parse_http_connection()`], and depending on the server type either spits out the
-/// headers made in the request when ServerFunction is Debug, or gets the file requested if
-/// ServerFunction is ServeFile, if function is ServeFile also makes sure it is not attempting to
+/// headers made in the request when server_function is Debug, or gets the file requested if
+/// server_function is ServeFile, if function is ServeFile also makes sure it is not attempting to
 /// do a file path escape.
 pub fn composeHttpResponse(
-    HttpServerFunction: ServerFunction,
+    Httpserver_function: server_function,
     parseReturnData: ParseReturnData,
 ) -> Vec<u8> {
-    if ServerFunction::Debug == HttpServerFunction {
+    if server_function::Debug == Httpserver_function {
         let mut HttpResponseStruct = HttpResponseStruct::new();
 
         HttpResponseStruct.setStatus(200);
@@ -38,7 +38,7 @@ pub fn composeHttpResponse(
         HttpResponseStruct.addDefaultHeaders();
 
         HttpResponseStruct.getResponse()
-    } else if ServerFunction::ServeFile == HttpServerFunction {
+    } else if server_function::ServeFile == Httpserver_function {
         if HttpRequestType::GET != parseReturnData.HttpRequestType {
             let mut response: HttpResponseStruct = HttpResponseStruct::new();
 

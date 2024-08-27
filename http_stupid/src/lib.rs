@@ -4,11 +4,11 @@ use std::{
     net::{Ipv4Addr, SocketAddrV4, TcpListener},
 };
 
-use crate::{httpCompose::composeHttpResponse, httpParser::*, httpStruct::*};
+use crate::{http_compose::composeHttpResponse, http_parser::*, http_struct::*};
 
 use errors_stupid::HttpServerError;
 use errors_stupid::StdStupidError;
-use httpCompose::compose_server_error;
+use http_compose::compose_server_error;
 
 /// Struct that is used to define our HTTP server, given a Function, an optional IP and an optional
 /// port, and if not given will run by default on 127.0.0.1:8080. And has functions to start using
@@ -39,63 +39,62 @@ use httpCompose::compose_server_error;
 /// ```
 #[derive(Debug)]
 pub struct HttpServer {
-    ListeningAddress: Ipv4Addr,
-    ServerFunction: ServerFunction,
-    Port: u16,
-    TcpListener: Option<TcpListener>,
+    listening_address: Ipv4Addr,
+    server_function: server_function,
+    port: u16,
+    tcp_listener: Option<TcpListener>,
 }
 
-pub mod httpCompose;
-pub mod httpParser;
-pub mod httpStruct;
+pub mod http_compose;
+pub mod http_parser;
+pub mod http_struct;
 
 impl HttpServer {
     /// Creates the HTTP server struct making sure the IP is valid and not inside of the
     /// multicast/documentation range and if not provided goes with default Port and IP, and if so returns the created struct
     pub fn new(
-        ServerFunctionType: ServerFunction,
-        IpAddressGiven: Option<String>,
-        PortGiven: Option<u16>,
+        server_function_type: server_function,
+        ip_address_given: Option<String>,
+        port_given: Option<u16>,
     ) -> Result<Self, StdStupidError> {
         // Attempt to get port given, if not given then use default port 8080.
-        let PortToUse: u16 = PortGiven.unwrap_or(8080);
+        let port_to_use: u16 = port_given.unwrap_or(8080);
 
-        let IpAddressToUse: Ipv4Addr = IpAddressGiven
+        let ip_address_to_use: Ipv4Addr = ip_address_given
             .unwrap_or("127.0.0.1".parse().unwrap())
             .parse()
             .unwrap();
 
         // Checks if the address is multicast/Documentation range, if yes rejects.
-        if IpAddressToUse.is_multicast() {
-            let _ = Into::<StdStupidError>::into(HttpServerError::new(
-                "IP Address Given is designated as Multicast",
-            ));
+        if ip_address_to_use.is_multicast() {
+            return Err(HttpServerError::new("IP Address Given is designated as Multicast").into());
         }
-        if IpAddressToUse.is_documentation() {
-            let _ = Into::<StdStupidError>::into(HttpServerError::new(
+        if ip_address_to_use.is_documentation() {
+            return Err(HttpServerError::new(
                 "IP Address Given is designated as Documentation IP range.",
-            ));
+            )
+            .into());
         }
 
         Ok(Self {
-            ListeningAddress: IpAddressToUse,
-            ServerFunction: ServerFunctionType,
-            TcpListener: None,
-            Port: PortToUse,
+            listening_address: ip_address_to_use,
+            server_function: server_function_type,
+            tcp_listener: None,
+            port: port_to_use,
         })
     }
 
     /// Starts the listener for the HTTP server, if succesful returns nothing, if not panics, most
     /// likley to happen if port is already in use and panic message will be displayed. Also sets
     /// the port to be non-blocking to allow simultanious connection proccesing.
-    pub fn setupListener(&mut self) -> Result<(), StdStupidError> {
-        let socketAddress: SocketAddrV4 = SocketAddrV4::new(self.ListeningAddress, self.Port);
-        let listenerReturn = TcpListener::bind(socketAddress);
+    pub fn setup_listener(&mut self) -> Result<(), StdStupidError> {
+        let socket_address: SocketAddrV4 = SocketAddrV4::new(self.listening_address, self.port);
+        let listener_return = TcpListener::bind(socket_address);
 
-        match listenerReturn {
+        match listener_return {
             Ok(o) => {
                 o.set_nonblocking(true)?;
-                self.TcpListener = Some(o);
+                self.tcp_listener = Some(o);
                 Ok(())
             }
             Err(e) => panic!("{e:?}"),
@@ -105,17 +104,17 @@ impl HttpServer {
     /// Starts the listening loop on the listener created in [`HttpServer::setupListener()`], it takes a stream and accepts it, assuming the stream is ready and it is a valid TCP stream it will read it into the buffer to be parsed by [`httpParser::parse_http_connection()`].
     /// After this it calls [`httpCompose::composeHttpResponse()`] with the data gotten to get the
     /// response to be used for the HTTP request and writes this back to the TcpStream.
-    pub fn startListening(&mut self) -> Result<(), StdStupidError> {
-        for stream in self.TcpListener.as_ref().unwrap().incoming() {
+    pub fn start_listening(&mut self) -> Result<(), StdStupidError> {
+        for stream in self.tcp_listener.as_ref().unwrap().incoming() {
             match stream {
                 Ok(mut o) => {
                     let mut reader = BufReader::new(&o);
 
-                    let recieveBuffer = reader.fill_buf().unwrap().to_vec();
+                    let recieve_buffer = reader.fill_buf().unwrap().to_vec();
 
-                    match parse_http_connection(recieveBuffer) {
+                    match parse_http_connection(recieve_buffer) {
                         Ok(d) => o.write_all(
-                            composeHttpResponse(self.GetServerFunction(), d).as_slice(),
+                            composeHttpResponse(self.get_server_function(), d).as_slice(),
                         )?,
                         Err(_) => o.write_all(compose_server_error().as_slice())?,
                     };
@@ -129,15 +128,15 @@ impl HttpServer {
         Ok(())
     }
 
-    pub fn GetServerFunction(&self) -> ServerFunction {
-        self.ServerFunction
+    pub fn get_server_function(&self) -> server_function {
+        self.server_function
     }
 
-    pub fn getServerPort(&self) -> u16 {
-        self.Port
+    pub fn get_server_port(&self) -> u16 {
+        self.port
     }
 
-    pub fn getServerIP(&self) -> Ipv4Addr {
-        self.ListeningAddress
+    pub fn get_server_ip(&self) -> Ipv4Addr {
+        self.listening_address
     }
 }

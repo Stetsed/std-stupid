@@ -21,7 +21,7 @@ pub enum HttpRequestType {
 
 #[allow(clippy::upper_case_acronyms, dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum ServerFunction {
+pub enum server_function {
     ServeFile,
     Debug,
     Proxy,

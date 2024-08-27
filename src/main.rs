@@ -3,7 +3,7 @@
 mod random_stupid;
 
 use errors_stupid::*;
-use http_stupid::httpStruct::*;
+use http_stupid::http_struct::*;
 use http_stupid::HttpServer;
 
 fn main() -> Result<(), StdStupidError> {
@@ -11,14 +11,14 @@ fn main() -> Result<(), StdStupidError> {
     let portTouse: u16 = 9182;
 
     let mut HttpServer = HttpServer::new(
-        ServerFunction::ServeFile,
+        server_function::ServeFile,
         Some(IpAddressToUse),
         Some(portTouse),
     )?;
 
-    HttpServer.setupListener()?;
+    HttpServer.setup_listener()?;
 
-    HttpServer.startListening()?;
+    HttpServer.start_listening()?;
 
     Ok(())
 }
