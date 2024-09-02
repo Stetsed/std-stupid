@@ -140,3 +140,46 @@ impl HttpServer {
         self.listening_address
     }
 }
+
+#[cfg(test)]
+mod http_stupid_tests {
+    use crate::{server_function, HttpServer};
+
+    #[test]
+    fn setup_server_normally() {
+        let ip_address_to_use: String = "127.0.0.1".to_string();
+        let port_to_use: u16 = 9182;
+
+        let _ = HttpServer::new(
+            server_function::Debug,
+            Some(ip_address_to_use),
+            Some(port_to_use),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn double_server_on_same_port() {
+        let ip_address_to_use: String = "127.0.0.1".to_string();
+        let port_to_use: u16 = 9182;
+
+        let mut server_a = HttpServer::new(
+            server_function::Debug,
+            Some(ip_address_to_use.clone()),
+            Some(port_to_use),
+        )
+        .unwrap();
+
+        server_a.setup_listener().unwrap();
+
+        let mut server_b = HttpServer::new(
+            server_function::Debug,
+            Some(ip_address_to_use.clone()),
+            Some(port_to_use),
+        )
+        .unwrap();
+
+        server_b.setup_listener().unwrap();
+    }
+}

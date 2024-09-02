@@ -2,8 +2,7 @@ pub mod standard {}
 
 use errors_stupid::*;
 
-#[allow(dead_code)]
-pub fn mapRange(
+pub fn map_range(
     min_in: i64,
     max_in: i64,
     min_out: i64,
@@ -11,57 +10,58 @@ pub fn mapRange(
     value: i64,
 ) -> Result<i64, StdStupidError> {
     if min_in > value || max_in < value {
-        let _ = Into::<StdStupidError>::into(IntValueError::new("Value out of bounds of input"));
+        return Err(IntValueError::new("Value out of bounds of input").into());
     }
 
-    let calculate_range_differential: f64 =
-        1.0 * ((max_out - min_out) as f64) / ((max_in - max_out) as f64);
-    println!("Range Diff: {}", calculate_range_differential);
-    let return_value: i64 =
-        (min_out as f64 + calculate_range_differential * (value - min_in) as f64) as i64;
-    Ok(return_value)
-}
-
-#[allow(dead_code)]
-pub fn findSubStringWithString(array: &[u8], subString: String) -> Result<u32, StdStupidError> {
-    let subStringAsBytes: Vec<u8> = b"subString".to_vec();
-    let subStringLength = subString.len();
-    let mut location: Option<u32> = None;
-
-    for i in 0..(array.len() - 1) {
-        if array[i] == subStringAsBytes[0] {
-            let compare = array[i..i + subStringLength].to_vec();
-
-            if compare == subStringAsBytes {
-                location = Some(i as u32);
-                break;
-            }
-        }
+    if min_in > max_in || max_out < min_out {
+        return Err(IntValueError::new(
+            "Value provided for the in/output bounds are invalid as max is not greater than min",
+        )
+        .into());
     }
 
-    match location {
-        Some(e) => Ok(e),
-        None => Err(SubStringError::new("Substring has not been found in provided input").into()),
-    }
+    let slope: f64 = (max_out - min_out) as f64 / (max_in - min_in) as f64;
+
+    let output: i64 = (min_out as f64 + (slope * (value - min_in) as f64)) as i64;
+
+    Ok(output)
 }
 
 pub fn findSubStringWithBytes(
     array: &[u8],
-    subStringAsBytes: &[u8],
+    sub_string_as_bytes: &[u8],
 ) -> Result<u32, StdStupidError> {
-    let subStringLength = subStringAsBytes.len();
-    let arrayLength = array.len();
+    let sub_string_length = sub_string_as_bytes.len();
+    let array_length = array.len();
     let mut location: Option<u32> = None;
 
-    if subStringLength < array.len() && subStringLength != 0 {
-        for i in 0..(arrayLength - subStringLength) {
-            if array[i] == subStringAsBytes[0] {
-                let compare = array[i..i + subStringLength].to_vec();
-
-                if compare == subStringAsBytes {
-                    location = Some(i as u32);
+    // if sub_string_length < array_length && sub_string_length != 0 {
+    //     for i in 0..(array_length + 1 - sub_string_length) {
+    //         if array[i] == sub_string_as_bytes[0]
+    //             && array[i + 1..i + sub_string_length] == sub_string_as_bytes[1..]
+    //         {
+    //             location = Some(i as u32);
+    //             break;
+    //         }
+    //     }
+    // } else if sub_string_length == array_length && *array == *sub_string_as_bytes {
+    //     location = Some(0)
+    // }
+    if sub_string_length == 0 {
+        location = None;
+    } else if sub_string_length == array_length && *array == *sub_string_as_bytes {
+        location = Some(0)
+    } else if sub_string_length < array_length {
+        let mut counter = 0;
+        for (i, ct) in array.iter().enumerate() {
+            if sub_string_as_bytes[counter] == *ct {
+                counter += 1;
+                if counter == sub_string_length {
+                    location = Some((i - sub_string_length + 1) as u32);
                     break;
                 }
+            } else {
+                counter = 0;
             }
         }
     }
@@ -69,5 +69,39 @@ pub fn findSubStringWithBytes(
     match location {
         Some(e) => Ok(e),
         None => Err(SubStringError::new("Substring has not been found in provided input").into()),
+    }
+}
+
+#[cfg(test)]
+mod standard_stupid_tests {
+    use crate::findSubStringWithBytes;
+
+    #[test]
+    #[should_panic]
+    fn sub_string_doesnt_match() {
+        let input = "Does not Match";
+        let sub_string = "hello";
+
+        findSubStringWithBytes(input.as_bytes(), sub_string.as_bytes()).unwrap();
+    }
+
+    #[test]
+    fn sub_string_does_match() {
+        let input = "Does match";
+        let sub_string = "match";
+
+        let location = findSubStringWithBytes(input.as_bytes(), sub_string.as_bytes()).unwrap();
+
+        assert_eq!(location, 5);
+    }
+
+    #[test]
+    fn sub_string_exact_math() {
+        let input = "Match";
+        let sub_string = "Match";
+
+        let location = findSubStringWithBytes(input.as_bytes(), sub_string.as_bytes()).unwrap();
+
+        assert_eq!(location, 0)
     }
 }

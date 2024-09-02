@@ -1,6 +1,5 @@
 #![feature(addr_parse_ascii, ip, tcplistener_into_incoming)]
 #![allow(non_snake_case)]
-mod random_stupid;
 
 use errors_stupid::*;
 use http_stupid::http_struct::*;
@@ -11,7 +10,7 @@ fn main() -> Result<(), StdStupidError> {
     let portTouse: u16 = 9182;
 
     let mut HttpServer = HttpServer::new(
-        server_function::ServeFile,
+        server_function::Debug,
         Some(IpAddressToUse),
         Some(portTouse),
     )?;
