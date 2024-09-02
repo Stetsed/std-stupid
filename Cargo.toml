@@ -9,7 +9,9 @@ edition = "2021"
 http_stupid = { path = "./http_stupid" }
 errors_stupid = { path = "./errors_stupid/" }
 standard_stupid = { path = "./standard_stupid/" }
+async_http_stupid = {path = "./async_http_stupid/"}
+async-std = "1.12.0"
 
 [workspace]
 
-members = ["http_stupid", "errors_stupid", "standard_stupid"]
+members = ["http_stupid", "errors_stupid", "standard_stupid", "async_http_stupid"]

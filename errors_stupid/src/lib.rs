@@ -76,6 +76,7 @@ pub enum StdStupidError {
     Utf8Parsing(std::str::Utf8Error),
     ParseFloat(std::num::ParseFloatError),
     StdIO(std::io::Error),
+    AsyncStdIo(async_std::io::Error),
 }
 
 impl Error for StdStupidError {}

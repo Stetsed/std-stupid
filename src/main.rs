@@ -1,11 +1,12 @@
 #![feature(addr_parse_ascii, ip, tcplistener_into_incoming)]
 #![allow(non_snake_case)]
 
+use async_http_stupid::http_struct::*;
+use async_http_stupid::HttpServer;
 use errors_stupid::*;
-use http_stupid::http_struct::*;
-use http_stupid::HttpServer;
 
-fn main() -> Result<(), StdStupidError> {
+#[async_std::main]
+async fn main() -> Result<(), StdStupidError> {
     let IpAddressToUse: String = "0.0.0.0".to_string();
     let portTouse: u16 = 9182;
 
@@ -15,9 +16,9 @@ fn main() -> Result<(), StdStupidError> {
         Some(portTouse),
     )?;
 
-    HttpServer.setup_listener()?;
+    HttpServer.setup_listener().await?;
 
-    HttpServer.start_listening()?;
+    HttpServer.start_listening().await?;
 
     Ok(())
 }
