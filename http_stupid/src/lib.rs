@@ -110,7 +110,7 @@ impl HttpServer {
                 Ok(mut o) => {
                     let mut reader = BufReader::new(&o);
 
-                    let recieve_buffer = reader.fill_buf().unwrap().to_vec();
+                    let recieve_buffer = reader.fill_buf().unwrap();
 
                     match parse_http_connection(recieve_buffer) {
                         Ok(d) => o.write_all(
@@ -143,7 +143,7 @@ impl HttpServer {
 
 #[cfg(test)]
 mod http_stupid_tests {
-    use crate::{server_function, HttpServer};
+    use crate::*;
 
     #[test]
     fn setup_server_normally() {

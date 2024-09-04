@@ -4,13 +4,20 @@ use crate::*;
 use errors_stupid::StdStupidError;
 use standard_stupid::findSubStringWithBytes;
 
-/// Takes an argument of `Vec<u8>` with the data contained being that from a buffered reader on a
+/// Takes an argument of `&[u8]` with the data contained being that from a buffered reader on a
 /// TCPListerner and returns the data contained within including the httpVersion used, the type of request that was recieved, the path that was requested,
 /// and lastly a hash map of all the headers in a <String, String> format where the key is the
 /// header name and the content is the headers content inside of the Struct of [`httpStruct::ParseReturnData`]
 pub fn parse_http_connection(
-    mut connection_data: Vec<u8>,
+    mut connection_data_raw: &[u8],
 ) -> Result<ParseReturnData, StdStupidError> {
+
+    for i in connection_data_raw.lines(){
+        println!("new line");
+        println!("{:?}", i.unwrap());
+    }
+
+    let mut connection_data = connection_data_raw.to_vec();
     // Find the / to find the method being used
     let method_location = findSubStringWithBytes(connection_data.as_slice(), b"/")?;
 

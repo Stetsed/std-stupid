@@ -35,18 +35,6 @@ pub fn findSubStringWithBytes(
     let array_length = array.len();
     let mut location: Option<u32> = None;
 
-    // if sub_string_length < array_length && sub_string_length != 0 {
-    //     for i in 0..(array_length + 1 - sub_string_length) {
-    //         if array[i] == sub_string_as_bytes[0]
-    //             && array[i + 1..i + sub_string_length] == sub_string_as_bytes[1..]
-    //         {
-    //             location = Some(i as u32);
-    //             break;
-    //         }
-    //     }
-    // } else if sub_string_length == array_length && *array == *sub_string_as_bytes {
-    //     location = Some(0)
-    // }
     if sub_string_length == 0 {
         location = None;
     } else if sub_string_length == array_length && *array == *sub_string_as_bytes {
