@@ -1,6 +1,5 @@
 use crate::*;
 use errors_stupid::StdStupidError;
-use standard_stupid::findSubStringWithBytes;
 use std::{collections::HashMap, str};
 
 /// Takes an argument of `&[u8]` with the data contained being that from a buffered reader on a
@@ -8,7 +7,7 @@ use std::{collections::HashMap, str};
 /// and lastly a hash map of all the headers in a <String, String> format where the key is the
 /// header name and the content is the headers content inside of the Struct of [`httpStruct::ParseReturnData`]
 pub fn parse_http_connection(
-    mut connection_data_raw: &[u8],
+    connection_data_raw: &[u8],
 ) -> Result<ParseReturnData, StdStupidError> {
     let mut header_hash_map: HashMap<String, String> = HashMap::new();
     let mut http_version_given: Option<f32> = None;
@@ -33,7 +32,7 @@ pub fn parse_http_connection(
                 .ok_or_else(|| {
                     HttpServerError::new("Failed to split string... should be impossible")
                 })?;
-            http_request_type_given = Some(parse_http_request_type(str::from_utf8(http).unwrap()));
+            http_request_type_given = Some(parse_http_request_type(str::from_utf8(http)?));
             (path, rest) = rest
                 .split_at_checked(
                     rest.windows(1)
@@ -88,21 +87,17 @@ pub fn parse_http_connection(
         }
     }
 
-    if http_version_given.is_some()
-        && http_request_type_given.is_some()
-        && http_path_given.is_some()
-    {
-        Ok(ParseReturnData {
-            httpVersion: http_version_given.unwrap(),
-            HttpRequestType: http_request_type_given.unwrap(),
-            requestPath: http_path_given.unwrap(),
-            headers: header_hash_map,
-        })
-    } else {
-        Err(StdStupidError::HttpServer(HttpServerError {
-            source: "One of the connection points was invalid".into(),
-        }))
-    }
+    Ok(ParseReturnData {
+        httpVersion: http_version_given
+            .ok_or_else(|| HttpServerError::new("HTTP Version of the connection was invalid"))?,
+        HttpRequestType: http_request_type_given.ok_or_else(|| {
+            HttpServerError::new("Request Type Version of the connection was invalid")
+        })?,
+        requestPath: http_path_given.ok_or_else(|| {
+            HttpServerError::new("Request Path Version of the connection was invalid")
+        })?,
+        headers: header_hash_map,
+    })
 }
 
 fn parse_http_request_type<T: AsRef<str>>(to_parse: T) -> HttpRequestType {

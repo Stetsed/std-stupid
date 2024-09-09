@@ -10,6 +10,8 @@ use errors_stupid::HttpServerError;
 use errors_stupid::StdStupidError;
 use http_compose::compose_server_error;
 
+const MAX_RECIEVE_BUFFER: usize = 2048;
+
 /// Struct that is used to define our HTTP server, given a Function, an optional IP and an optional
 /// port, and if not given will run by default on 127.0.0.1:8080. And has functions to start using
 /// the HTTP server with it's defined function
@@ -54,16 +56,13 @@ impl HttpServer {
     /// multicast/documentation range and if not provided goes with default Port and IP, and if so returns the created struct
     pub fn new(
         server_function_type: server_function,
-        ip_address_given: Option<String>,
+        ip_address_given: Option<&str>,
         port_given: Option<u16>,
     ) -> Result<Self, StdStupidError> {
         // Attempt to get port given, if not given then use default port 8080.
         let port_to_use: u16 = port_given.unwrap_or(8080);
 
-        let ip_address_to_use: Ipv4Addr = ip_address_given
-            .unwrap_or("127.0.0.1".parse().unwrap())
-            .parse()
-            .unwrap();
+        let ip_address_to_use: Ipv4Addr = ip_address_given.unwrap_or("127.0.0.1").parse()?;
 
         // Checks if the address is multicast/Documentation range, if yes rejects.
         if ip_address_to_use.is_multicast() {
@@ -105,19 +104,28 @@ impl HttpServer {
     /// After this it calls [`httpCompose::composeHttpResponse()`] with the data gotten to get the
     /// response to be used for the HTTP request and writes this back to the TcpStream.
     pub fn start_listening(&mut self) -> Result<(), StdStupidError> {
-        for stream in self.tcp_listener.as_ref().unwrap().incoming() {
+        for stream in self
+            .tcp_listener
+            .as_ref()
+            .expect("You should have a TCPlistener... how??")
+            .incoming()
+        {
             match stream {
                 Ok(mut o) => {
-                    let mut reader = BufReader::new(&o);
+                    let mut receive_buffer: [u8; MAX_RECIEVE_BUFFER] = [0; MAX_RECIEVE_BUFFER];
 
-                    let recieve_buffer = reader.fill_buf().unwrap();
+                    let amount = o.read(&mut receive_buffer)?;
 
-                    match parse_http_connection(recieve_buffer) {
-                        Ok(d) => o.write_all(
-                            compose_http_response(self.get_server_function(), d).as_slice(),
-                        )?,
-                        Err(_) => o.write_all(compose_server_error().as_slice())?,
-                    };
+                    if amount == 0 {
+                        o.write_all(&compose_server_error())?;
+                    } else {
+                        match parse_http_connection(&receive_buffer) {
+                            Ok(d) => &o.write_all(
+                                compose_http_response(self.get_server_function(), d).as_slice(),
+                            )?,
+                            Err(_) => &o.write_all(compose_server_error().as_slice())?,
+                        };
+                    }
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     continue;
@@ -147,7 +155,7 @@ mod http_stupid_tests {
 
     #[test]
     fn setup_server_normally() {
-        let ip_address_to_use: String = "127.0.0.1".to_string();
+        let ip_address_to_use = "127.0.0.1";
         let port_to_use: u16 = 9182;
 
         let _ = HttpServer::new(
@@ -161,12 +169,12 @@ mod http_stupid_tests {
     #[test]
     #[should_panic]
     fn double_server_on_same_port() {
-        let ip_address_to_use: String = "127.0.0.1".to_string();
+        let ip_address_to_use = "127.0.0.1";
         let port_to_use: u16 = 9182;
 
         let mut server_a = HttpServer::new(
             server_function::Debug,
-            Some(ip_address_to_use.clone()),
+            Some(ip_address_to_use),
             Some(port_to_use),
         )
         .unwrap();
@@ -175,7 +183,7 @@ mod http_stupid_tests {
 
         let mut server_b = HttpServer::new(
             server_function::Debug,
-            Some(ip_address_to_use.clone()),
+            Some(ip_address_to_use),
             Some(port_to_use),
         )
         .unwrap();

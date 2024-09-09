@@ -61,9 +61,6 @@ pub fn compose_http_response(
 
             path.push_str(path_given);
 
-            #[cfg(debug_assertions)]
-            println!("Path: {}", path);
-
             if contains_prohibited {
                 let mut response: HttpResponseStruct = HttpResponseStruct::new();
 
@@ -75,18 +72,21 @@ pub fn compose_http_response(
             } else {
                 let mut response: HttpResponseStruct = HttpResponseStruct::new();
 
-                let file = File::open(path).unwrap();
+                match File::open(path) {
+                    Ok(f) => {
+                        let mut buffer: String = String::new();
 
-                let mut buf_reader: BufReader<File> = BufReader::new(file);
+                        let mut buf_reader: BufReader<File> = BufReader::new(f);
 
-                let mut buffer: String = String::new();
+                        let read_status = buf_reader.read_to_string(&mut buffer);
 
-                let read_status = buf_reader.read_to_string(&mut buffer);
-
-                match read_status {
-                    Ok(_) => {
-                        response.setBody(buffer);
-                        response.setStatus(200);
+                        match read_status {
+                            Ok(_) => {
+                                response.setBody(buffer);
+                                response.setStatus(200);
+                            }
+                            Err(_) => response.setStatus(500),
+                        };
                     }
                     Err(_) => response.setStatus(404),
                 };

@@ -76,6 +76,7 @@ pub enum StdStupidError {
     Utf8Parsing(std::str::Utf8Error),
     ParseFloat(std::num::ParseFloatError),
     StdIO(std::io::Error),
+    AddrParse(std::net::AddrParseError),
 }
 
 impl Error for StdStupidError {}
@@ -119,5 +120,11 @@ impl From<ParseFloatError> for StdStupidError {
 impl From<std::io::Error> for StdStupidError {
     fn from(error: std::io::Error) -> Self {
         Self::StdIO(error)
+    }
+}
+
+impl From<std::net::AddrParseError> for StdStupidError {
+    fn from(error: std::net::AddrParseError) -> Self {
+        Self::AddrParse(error)
     }
 }
