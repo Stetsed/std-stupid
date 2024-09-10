@@ -9,6 +9,12 @@ edition = "2021"
 http_stupid = { path = "./http_stupid" }
 errors_stupid = { path = "./errors_stupid/" }
 standard_stupid = { path = "./standard_stupid/" }
+tracing = { version = "0.1.40", default-features = false, features = [
+  "log",
+  "attributes",
+  "valuable",
+  "async-await",
+] }
 
 [workspace]
 

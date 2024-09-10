@@ -3,6 +3,7 @@ use std::{
     io::{self, prelude::*, BufReader, Write},
     net::{Ipv4Addr, SocketAddrV4, TcpListener},
 };
+use tracing::{debug, error, info, span, warn, Level};
 
 use crate::{http_compose::compose_http_response, http_parser::*, http_struct::*};
 
@@ -11,6 +12,8 @@ use errors_stupid::StdStupidError;
 use http_compose::compose_server_error;
 
 const MAX_RECIEVE_BUFFER: usize = 2048;
+const DEFAULT_LISTEN_TO_PORT: u16 = 8080;
+const DEFAULT_LISTEN_TO_IP: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
 
 /// Struct that is used to define our HTTP server, given a Function, an optional IP and an optional
 /// port, and if not given will run by default on 127.0.0.1:8080. And has functions to start using
@@ -59,10 +62,15 @@ impl HttpServer {
         ip_address_given: Option<&str>,
         port_given: Option<u16>,
     ) -> Result<Self, StdStupidError> {
-        // Attempt to get port given, if not given then use default port 8080.
-        let port_to_use: u16 = port_given.unwrap_or(8080);
+        let port_to_use: u16 = match port_given {
+            Some(p) => p,
+            None => DEFAULT_LISTEN_TO_PORT,
+        };
 
-        let ip_address_to_use: Ipv4Addr = ip_address_given.unwrap_or("127.0.0.1").parse()?;
+        let ip_address_to_use: Ipv4Addr = match ip_address_given {
+            Some(i) => i.parse::<Ipv4Addr>()?,
+            None => DEFAULT_LISTEN_TO_IP,
+        };
 
         // Checks if the address is multicast/Documentation range, if yes rejects.
         if ip_address_to_use.is_multicast() {
@@ -121,7 +129,7 @@ impl HttpServer {
                     } else {
                         match parse_http_connection(&receive_buffer) {
                             Ok(d) => &o.write_all(
-                                compose_http_response(self.get_server_function(), d).as_slice(),
+                                compose_http_response(self.server_function, d).as_slice(),
                             )?,
                             Err(_) => &o.write_all(compose_server_error().as_slice())?,
                         };
@@ -134,18 +142,6 @@ impl HttpServer {
             }
         }
         Ok(())
-    }
-
-    pub fn get_server_function(&self) -> server_function {
-        self.server_function
-    }
-
-    pub fn get_server_port(&self) -> u16 {
-        self.port
-    }
-
-    pub fn get_server_ip(&self) -> Ipv4Addr {
-        self.listening_address
     }
 }
 

@@ -2,6 +2,8 @@ use crate::*;
 use errors_stupid::StdStupidError;
 use std::{collections::HashMap, str};
 
+use tracing::{debug, error, info, span, warn, Level};
+
 /// Takes an argument of `&[u8]` with the data contained being that from a buffered reader on a
 /// TCPListerner and returns the data contained within including the httpVersion used, the type of request that was recieved, the path that was requested,
 /// and lastly a hash map of all the headers in a <String, String> format where the key is the
@@ -10,6 +12,7 @@ pub fn parse_http_connection(
     connection_data_raw: &[u8],
 ) -> Result<ParseReturnData, StdStupidError> {
     let mut header_hash_map: HashMap<String, String> = HashMap::new();
+
     let mut http_version_given: Option<f32> = None;
     let mut http_request_type_given: Option<HttpRequestType> = None;
     let mut http_path_given: Option<String> = None;

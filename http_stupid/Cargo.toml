@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 errors_stupid = { path = "../errors_stupid/" }
 standard_stupid = { path = "../standard_stupid/" }
+tracing = { version = "0.1.38", default-features = false , features=["log", "attributes", "valuable", "async-await"]}
