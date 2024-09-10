@@ -85,10 +85,16 @@ pub fn compose_http_response(
                                 response.setBody(buffer);
                                 response.setStatus(200);
                             }
-                            Err(_) => response.setStatus(500),
+                            Err(_) => {
+                                debug!("File read failed");
+                                response.setStatus(500)
+                            }
                         };
                     }
-                    Err(_) => response.setStatus(404),
+                    Err(_) => {
+                        debug!("File was not found");
+                        response.setStatus(404)
+                    }
                 };
 
                 response.addDefaultHeaders();

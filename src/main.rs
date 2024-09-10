@@ -4,8 +4,11 @@
 use errors_stupid::*;
 use http_stupid::http_struct::*;
 use http_stupid::HttpServer;
+use tracing::Level;
 
 fn main() -> Result<(), StdStupidError> {
+
+    tracing_subscriber::fmt().with_max_level(Level::DEBUG).init();
     let IpAddressToUse = "0.0.0.0";
     let portTouse: u16 = 9182;
 

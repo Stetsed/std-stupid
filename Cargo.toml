@@ -9,6 +9,7 @@ edition = "2021"
 http_stupid = { path = "./http_stupid" }
 errors_stupid = { path = "./errors_stupid/" }
 standard_stupid = { path = "./standard_stupid/" }
+# no-std crates
 tracing = { version = "0.1.40", default-features = false, features = [
   "log",
   "attributes",
@@ -16,6 +17,8 @@ tracing = { version = "0.1.40", default-features = false, features = [
   "async-await",
 ] }
 
+# Try to get away from these
+tracing-subscriber = { version = "0.3.18" }
 [workspace]
 
 members = ["http_stupid", "errors_stupid", "standard_stupid"]

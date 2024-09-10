@@ -3,7 +3,7 @@ use std::{
     io::{self, prelude::*, BufReader, Write},
     net::{Ipv4Addr, SocketAddrV4, TcpListener},
 };
-use tracing::{debug, error, info, span, warn, Level};
+use tracing::{debug, error, info, span, warn, Level, trace};
 
 use crate::{http_compose::compose_http_response, http_parser::*, http_struct::*};
 
@@ -74,9 +74,17 @@ impl HttpServer {
 
         // Checks if the address is multicast/Documentation range, if yes rejects.
         if ip_address_to_use.is_multicast() {
+            error!(
+                "IP Address {} is inside of the  range, invalid.",
+                ip_address_to_use
+            );
             return Err(HttpServerError::new("IP Address Given is designated as Multicast").into());
         }
         if ip_address_to_use.is_documentation() {
+            error!(
+                "IP Address {} is inside of the documentation range, invalid.",
+                ip_address_to_use
+            );
             return Err(HttpServerError::new(
                 "IP Address Given is designated as Documentation IP range.",
             )
@@ -100,6 +108,10 @@ impl HttpServer {
 
         match listener_return {
             Ok(o) => {
+                info!(
+                    "HTTP server is now listening on {:?}:{:?} in server mode {:?}",
+                    self.listening_address, self.port, self.server_function
+                );
                 o.set_nonblocking(true)?;
                 self.tcp_listener = Some(o);
                 Ok(())
@@ -124,14 +136,23 @@ impl HttpServer {
 
                     let amount = o.read(&mut receive_buffer)?;
 
+                    trace!("Recieved a message of {} bytes", amount);
+
                     if amount == 0 {
                         o.write_all(&compose_server_error())?;
+                        trace!("Responded to message with error");
                     } else {
                         match parse_http_connection(&receive_buffer) {
-                            Ok(d) => &o.write_all(
-                                compose_http_response(self.server_function, d).as_slice(),
-                            )?,
-                            Err(_) => &o.write_all(compose_server_error().as_slice())?,
+                            Ok(d) => {
+                                let _ = &o.write_all(
+                                    compose_http_response(self.server_function, d).as_slice(),
+                                )?;
+                                trace!("Responded to message with sucess");
+                            }
+                            Err(_) => {
+                                let _ = &o.write_all(compose_server_error().as_slice())?;
+                                trace!("Responded to message with error");
+                            }
                         };
                     }
                 }
