@@ -3,6 +3,7 @@ use std::{
     fs::write,
     io::{self, prelude::*, BufReader, Write},
     net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream},
+    time::{Duration, Instant},
 };
 use tracing::{debug, error, info, span, trace, warn, Level};
 
@@ -133,6 +134,7 @@ impl HttpServer {
     /// After this it calls [`httpCompose::composeHttpResponse()`] with the data gotten to get the
     /// response to be used for the HTTP request and writes this back to the TcpStream.
     pub fn start_listening(&mut self) -> Result<(), StdStupidError> {
+        let server_function = self.server_function;
         for stream in self
             .tcp_listener
             .as_ref()
@@ -141,8 +143,9 @@ impl HttpServer {
         {
             match stream {
                 Ok(mut o) => {
-                    self.thread_pool
-                        .execute(|| process_connection(self.server_function, &mut o));
+                    self.thread_pool.execute(move || {
+                        process_connection(server_function, &mut o, Instant::now())
+                    });
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     continue;
@@ -157,33 +160,42 @@ impl HttpServer {
 fn process_connection(
     server_function_type: server_function,
     stream: &mut TcpStream,
-) -> Result<(), StdStupidError> {
-    let mut receive_buffer: [u8; MAX_RECIEVE_BUFFER] = [0; MAX_RECIEVE_BUFFER];
+    mut execute_time: Instant,
+) {
+    loop {
+        let now = Instant::now();
+        if now.duration_since(execute_time) > Duration::from_secs(7) {
+            debug!("Connection expired or read no more data, closing");
+            break;
+        } else {
+            let mut receive_buffer: [u8; MAX_RECIEVE_BUFFER] = [0; MAX_RECIEVE_BUFFER];
 
-    let amount = stream.read(&mut receive_buffer)?;
+            let amount = stream.read(&mut receive_buffer).unwrap_or(0);
 
-    trace!("Recieved a message of {} bytes", amount);
+            trace!("Recieved a message of {} bytes", amount);
 
-    if amount == 0 {
-        stream.write_all(&compose_server_error())?;
-        trace!("Responded to message with error");
-    } else {
-        if server_function_type == server_function::DumpRequest {
-            write("./request.binary", receive_buffer)?
-        }
-        match parse_http_connection(&receive_buffer) {
-            Ok(d) => {
-                let _ =
-                    &stream.write_all(compose_http_response(server_function_type, d).as_slice())?;
-                trace!("Responded to message with sucess");
-            }
-            Err(_) => {
-                let _ = &stream.write_all(compose_server_error().as_slice())?;
+            if amount == 0 {
+                let _ = stream.write_all(&compose_server_error());
                 trace!("Responded to message with error");
+            } else {
+                if server_function_type == server_function::DumpRequest {
+                    write("./request.binary", receive_buffer).unwrap()
+                }
+                match parse_http_connection(&receive_buffer) {
+                    Ok(d) => {
+                        let _ = &stream
+                            .write_all(compose_http_response(server_function_type, d).as_slice());
+                        trace!("Responded to message with sucess");
+                        execute_time = Instant::now();
+                    }
+                    Err(_) => {
+                        let _ = &stream.write_all(compose_server_error().as_slice());
+                        trace!("Responded to message with error");
+                    }
+                };
             }
-        };
+        }
     }
-    Ok(())
 }
 
 #[cfg(test)]

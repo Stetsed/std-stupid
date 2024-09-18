@@ -8,16 +8,21 @@ use standard_stupid::thread_manager::ThreadPool;
 use tracing::Level;
 
 fn main() -> Result<(), StdStupidError> {
-    let pool = ThreadPool::new(8);
-    tracing_subscriber::fmt()
-        .with_max_level(Level::DEBUG)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
-    for i in 0..1000 {
-        pool.execute(move || {
-            println!("{}", i);
-        });
-    }
+    let IpAddressToUse = "0.0.0.0";
+    let portTouse: u16 = 9182;
+
+    let mut HttpServer = HttpServer::new(
+        server_function::Debug,
+        Some(IpAddressToUse),
+        Some(portTouse),
+        256,
+    )?;
+
+    HttpServer.setup_listener()?;
+
+    HttpServer.start_listening()?;
 
     Ok(())
 }
