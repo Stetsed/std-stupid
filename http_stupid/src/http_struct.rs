@@ -24,6 +24,7 @@ pub enum HttpRequestType {
 pub enum server_function {
     ServeFile,
     Debug,
+    DumpRequest,
     Proxy,
 }
 

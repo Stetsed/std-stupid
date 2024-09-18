@@ -1,4 +1,3 @@
-pub mod standard {}
 
 use errors_stupid::*;
 

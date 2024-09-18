@@ -13,7 +13,7 @@ fn main() -> Result<(), StdStupidError> {
     let portTouse: u16 = 9182;
 
     let mut HttpServer = HttpServer::new(
-        server_function::ServeFile,
+        server_function::Debug,
         Some(IpAddressToUse),
         Some(portTouse),
     )?;

@@ -1,9 +1,11 @@
 use std::{
     fmt::Debug,
+    fs::write,
     io::{self, prelude::*, BufReader, Write},
-    net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream}, sync::{Arc, Mutex},
+    net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream},
+    sync::{Arc, Mutex},
 };
-use tracing::{debug, error, info, span, warn, Level, trace};
+use tracing::{debug, error, info, span, trace, warn, Level};
 
 use crate::{http_compose::compose_http_response, http_parser::*, http_struct::*};
 
@@ -48,7 +50,7 @@ pub struct HttpServer {
     server_function: server_function,
     port: u16,
     tcp_listener: Option<TcpListener>,
-    tcp_connections: Arc<Mutex<Vec<TcpStream>>>
+    tcp_connections: Arc<Mutex<Vec<TcpStream>>>,
 }
 
 pub mod http_compose;
@@ -97,7 +99,7 @@ impl HttpServer {
             server_function: server_function_type,
             tcp_listener: None,
             port: port_to_use,
-            tcp_connections: Arc::new(Mutex::new(Vec::new()))
+            tcp_connections: Arc::new(Mutex::new(Vec::new())),
         })
     }
 
@@ -134,35 +136,42 @@ impl HttpServer {
         {
             match stream {
                 Ok(mut o) => {
-                    let mut receive_buffer: [u8; MAX_RECIEVE_BUFFER] = [0; MAX_RECIEVE_BUFFER];
-
-                    let amount = o.read(&mut receive_buffer)?;
-
-                    trace!("Recieved a message of {} bytes", amount);
-
-                    if amount == 0 {
-                        o.write_all(&compose_server_error())?;
-                        trace!("Responded to message with error");
-                    } else {
-                        match parse_http_connection(&receive_buffer) {
-                            Ok(d) => {
-                                let _ = &o.write_all(
-                                    compose_http_response(self.server_function, d).as_slice(),
-                                )?;
-                                trace!("Responded to message with sucess");
-                            }
-                            Err(_) => {
-                                let _ = &o.write_all(compose_server_error().as_slice())?;
-                                trace!("Responded to message with error");
-                            }
-                        };
-                    }
+                    self.process_connection(&mut o)?;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     continue;
                 }
                 Err(e) => panic!("Something went very wrong... {:?}", e),
             }
+        }
+        Ok(())
+    }
+
+    fn process_connection(&self, stream: &mut TcpStream) -> Result<(), StdStupidError> {
+        let mut receive_buffer: [u8; MAX_RECIEVE_BUFFER] = [0; MAX_RECIEVE_BUFFER];
+
+        let amount = stream.read(&mut receive_buffer)?;
+
+        trace!("Recieved a message of {} bytes", amount);
+
+        if amount == 0 {
+            stream.write_all(&compose_server_error())?;
+            trace!("Responded to message with error");
+        } else {
+            if self.server_function == server_function::DumpRequest {
+                write("./request.binary", receive_buffer)?
+            }
+            match parse_http_connection(&receive_buffer) {
+                Ok(d) => {
+                    let _ = &stream
+                        .write_all(compose_http_response(self.server_function, d).as_slice())?;
+                    trace!("Responded to message with sucess");
+                }
+                Err(_) => {
+                    let _ = &stream.write_all(compose_server_error().as_slice())?;
+                    trace!("Responded to message with error");
+                }
+            };
         }
         Ok(())
     }

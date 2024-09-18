@@ -13,7 +13,7 @@ pub fn compose_http_response(
     http_server_function: server_function,
     parse_return_data: ParseReturnData,
 ) -> Vec<u8> {
-    if server_function::Debug == http_server_function {
+    if server_function::Debug == http_server_function || http_server_function == server_function::DumpRequest {
         let mut http_response_struct = HttpResponseStruct::new();
 
         http_response_struct.setStatus(200);
@@ -35,6 +35,8 @@ pub fn compose_http_response(
         http_response_struct.addDefaultHeaders();
 
         http_response_struct.getResponse()
+        
+
     } else if server_function::ServeFile == http_server_function {
         if HttpRequestType::GET != parse_return_data.HttpRequestType {
             let mut response: HttpResponseStruct = HttpResponseStruct::new();
@@ -102,7 +104,8 @@ pub fn compose_http_response(
                 response.getResponse()
             }
         }
-    } else {
+    }
+    else {
         todo!()
     }
 }
