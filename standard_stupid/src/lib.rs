@@ -1,3 +1,6 @@
+pub mod thread_manager;
+
+use crate::thread_manager::*;
 
 use errors_stupid::*;
 

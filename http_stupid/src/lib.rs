@@ -3,7 +3,6 @@ use std::{
     fs::write,
     io::{self, prelude::*, BufReader, Write},
     net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream},
-    sync::{Arc, Mutex},
 };
 use tracing::{debug, error, info, span, trace, warn, Level};
 
@@ -12,6 +11,7 @@ use crate::{http_compose::compose_http_response, http_parser::*, http_struct::*}
 use errors_stupid::HttpServerError;
 use errors_stupid::StdStupidError;
 use http_compose::compose_server_error;
+use standard_stupid::thread_manager::*;
 
 const MAX_RECIEVE_BUFFER: usize = 2048;
 const DEFAULT_LISTEN_TO_PORT: u16 = 8080;
@@ -25,7 +25,8 @@ const DEFAULT_LISTEN_TO_IP: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
 ///
 /// ```rust
 /// fn main() -> Result<(), StdStupidError> {
-///     // Start a HTTP server listening on 127.0.0.1 on port 9182, with the ServeFile Function
+///     // Start a HTTP server listening on 127.0.0.1 on port 9182, with the ServeFile Function,
+///     and 8 threads
 ///     let IpAddressToUse: String = "127.0.0.1".to_string();
 ///     let portTouse: u16 = 9182;
 ///
@@ -33,6 +34,7 @@ const DEFAULT_LISTEN_TO_IP: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
 ///         ServerFunction::ServeFile,
 ///         Some(IpAddressToUse),
 ///         Some(portTouse),
+///         8
 ///     )?;
 ///
 ///     // Start the TCP listening device.
@@ -50,7 +52,7 @@ pub struct HttpServer {
     server_function: server_function,
     port: u16,
     tcp_listener: Option<TcpListener>,
-    tcp_connections: Arc<Mutex<Vec<TcpStream>>>,
+    thread_pool: ThreadPool,
 }
 
 pub mod http_compose;
@@ -64,6 +66,7 @@ impl HttpServer {
         server_function_type: server_function,
         ip_address_given: Option<&str>,
         port_given: Option<u16>,
+        thread_count: usize,
     ) -> Result<Self, StdStupidError> {
         let port_to_use: u16 = match port_given {
             Some(p) => p,
@@ -94,12 +97,14 @@ impl HttpServer {
             .into());
         }
 
+        let thread_pool = ThreadPool::new(thread_count);
+
         Ok(Self {
             listening_address: ip_address_to_use,
             server_function: server_function_type,
             tcp_listener: None,
             port: port_to_use,
-            tcp_connections: Arc::new(Mutex::new(Vec::new())),
+            thread_pool,
         })
     }
 
@@ -136,7 +141,8 @@ impl HttpServer {
         {
             match stream {
                 Ok(mut o) => {
-                    self.process_connection(&mut o)?;
+                    self.thread_pool
+                        .execute(|| process_connection(self.server_function, &mut o));
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     continue;
@@ -146,35 +152,38 @@ impl HttpServer {
         }
         Ok(())
     }
+}
 
-    fn process_connection(&self, stream: &mut TcpStream) -> Result<(), StdStupidError> {
-        let mut receive_buffer: [u8; MAX_RECIEVE_BUFFER] = [0; MAX_RECIEVE_BUFFER];
+fn process_connection(
+    server_function_type: server_function,
+    stream: &mut TcpStream,
+) -> Result<(), StdStupidError> {
+    let mut receive_buffer: [u8; MAX_RECIEVE_BUFFER] = [0; MAX_RECIEVE_BUFFER];
 
-        let amount = stream.read(&mut receive_buffer)?;
+    let amount = stream.read(&mut receive_buffer)?;
 
-        trace!("Recieved a message of {} bytes", amount);
+    trace!("Recieved a message of {} bytes", amount);
 
-        if amount == 0 {
-            stream.write_all(&compose_server_error())?;
-            trace!("Responded to message with error");
-        } else {
-            if self.server_function == server_function::DumpRequest {
-                write("./request.binary", receive_buffer)?
-            }
-            match parse_http_connection(&receive_buffer) {
-                Ok(d) => {
-                    let _ = &stream
-                        .write_all(compose_http_response(self.server_function, d).as_slice())?;
-                    trace!("Responded to message with sucess");
-                }
-                Err(_) => {
-                    let _ = &stream.write_all(compose_server_error().as_slice())?;
-                    trace!("Responded to message with error");
-                }
-            };
+    if amount == 0 {
+        stream.write_all(&compose_server_error())?;
+        trace!("Responded to message with error");
+    } else {
+        if server_function_type == server_function::DumpRequest {
+            write("./request.binary", receive_buffer)?
         }
-        Ok(())
+        match parse_http_connection(&receive_buffer) {
+            Ok(d) => {
+                let _ =
+                    &stream.write_all(compose_http_response(server_function_type, d).as_slice())?;
+                trace!("Responded to message with sucess");
+            }
+            Err(_) => {
+                let _ = &stream.write_all(compose_server_error().as_slice())?;
+                trace!("Responded to message with error");
+            }
+        };
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -190,6 +199,7 @@ mod http_stupid_tests {
             server_function::Debug,
             Some(ip_address_to_use),
             Some(port_to_use),
+            8,
         )
         .unwrap();
     }
@@ -204,6 +214,7 @@ mod http_stupid_tests {
             server_function::Debug,
             Some(ip_address_to_use),
             Some(port_to_use),
+            8,
         )
         .unwrap();
 
@@ -213,6 +224,7 @@ mod http_stupid_tests {
             server_function::Debug,
             Some(ip_address_to_use),
             Some(port_to_use),
+            8,
         )
         .unwrap();
 

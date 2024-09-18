@@ -2,7 +2,7 @@ use crate::*;
 use errors_stupid::StdStupidError;
 use std::{collections::HashMap, str};
 
-use tracing::{debug, error, info, span, warn, Level};
+use tracing::{debug, error, field::debug, info, span, warn, Level};
 
 /// Takes an argument of `&[u8]` with the data contained being that from a buffered reader on a
 /// TCPListerner and returns the data contained within including the httpVersion used, the type of request that was recieved, the path that was requested,
@@ -16,7 +16,10 @@ pub fn parse_http_connection(
     let mut http_version_given: Option<f32> = None;
     let mut http_request_type_given: Option<HttpRequestType> = None;
     let mut http_path_given: Option<String> = None;
-    for (e, i) in connection_data_raw.lines().enumerate() {
+
+    let mut iterator = connection_data_raw.lines();
+
+    for (e, i) in iterator.by_ref().enumerate() {
         let unwrapped = i?;
 
         if e == 0 {
@@ -71,22 +74,36 @@ pub fn parse_http_connection(
             header_hash_map.insert(http_header_name, http_header_content);
         }
     }
+
+    let mut body: String = String::new();
+    for i in iterator {
+        if http_request_type_given == Some(HttpRequestType::POST)
+            && header_hash_map.contains_key("Content-Type")
+        {
+            let content = header_hash_map.get("Content-Type");
+            if content == Some(&"application/x-www-form-urlencoded".to_string()) {
+                debug!("Got a x-www-form-urlencoded post request, handling");
+                body = i?;
+            } else {
+                debug!("Unsupported post Content-Type");
+            }
+        }
+    }
+
     #[cfg(debug_assertions)]
     {
-        println!(
-            "HTTP Request path given by new functiopn was: {:?}",
-            http_path_given
-        );
-        println!(
-            "HTTP request type found by new function was: {:?}",
-            http_request_type_given
-        );
-        println!(
-            "HTTP Version given by new function was: {:?}",
-            http_version_given
+        debug!(
+            request_path = http_path_given, request_type = ?http_request_type_given, version = ?http_version_given
         );
         for (header, content) in &header_hash_map {
             println!("Header: {header} : {content}");
+        }
+        if !body.is_empty() {
+            println!("\n-----Body Contents----- ");
+            for i in body.splitn(64, "&") {
+                println!("{}", i);
+            }
+            println!("\n-----Body ended-----");
         }
     }
 
