@@ -79,7 +79,7 @@ impl HttpResponseStruct {
         self.addHeader("Server: std-stupid-http");
         self.addHeader("Content-Type: text/html");
         self.addHeader("Accept-Ranges: bytes");
-        self.addHeader("Connection: close");
+        //self.addHeader("Connection: close");
         self.addHeader("Cache-Control: no-cache");
     }
 
