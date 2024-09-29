@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
+use errors_stupid::StdStupidError;
+
 #[derive(Debug)]
-pub enum connectionReturn {
+pub enum ConnectionReturn {
     TcpStream,
     SocketAddr,
 }
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum HttpRequestType {
     GET,
@@ -19,9 +20,8 @@ pub enum HttpRequestType {
     INVALID,
 }
 
-#[allow(clippy::upper_case_acronyms, dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum server_function {
+pub enum ServerFunction {
     ServeFile,
     Debug,
     DumpRequest,
@@ -30,10 +30,11 @@ pub enum server_function {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseReturnData {
-    pub httpVersion: f32,
-    pub HttpRequestType: HttpRequestType,
-    pub requestPath: String,
+    pub http_version: f32,
+    pub http_request_type: HttpRequestType,
+    pub request_path: String,
     pub headers: HashMap<String, String>,
+    pub body: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -57,40 +58,38 @@ impl HttpResponseStruct {
             body: Vec::new(),
         }
     }
-    pub fn setStatus(&mut self, statusCode: u16) {
+    pub fn set_status(&mut self, status_code: u16) {
         self.status = Vec::from(
             format!(
                 "HTTP/1.1 {} {:?}\r\n",
-                statusCode,
-                HttpStatusCode::from(statusCode)
+                status_code,
+                HttpStatusCode::from(status_code)
             )
             .as_bytes(),
         )
     }
-    pub fn addHeader<T: AsRef<str>>(&mut self, header: T) {
+    pub fn add_header<T: AsRef<str>>(&mut self, header: T) {
         self.headers
             .extend_from_slice(format!("{}\r\n", header.as_ref()).as_bytes())
     }
 
-    pub fn setBody(&mut self, body: String) {
-        self.body.extend_from_slice(body.as_bytes())
+    pub fn set_body<T: AsRef<str>>(&mut self, body: T) {
+        self.body.extend_from_slice(body.as_ref().as_bytes())
     }
 
-    pub fn addDefaultHeaders(&mut self) {
-        self.addHeader("Server: std-stupid-http");
-        self.addHeader("Content-Type: text/html");
-        self.addHeader("Accept-Ranges: bytes");
-        self.addHeader("Keep-Alive: 7s");
-        //self.addHeader("Connection: close");
-        self.addHeader("Cache-Control: no-cache");
+    pub fn add_default_headers(&mut self) {
+        self.add_header("Server: std-stupid-http");
+        self.add_header("Content-Type: text/html");
+        self.add_header("Accept-Ranges: bytes");
+        self.add_header("Cache-Control: no-cache");
     }
 
-    pub fn getResponse(&mut self) -> Vec<u8> {
+    pub fn get_response(&mut self) -> Vec<u8> {
         let mut response_vec: Vec<u8> = Vec::new();
 
         response_vec.append(&mut self.status);
 
-        self.addHeader(format!("Content-Length: {}\r\n", self.body.len() + 2));
+        self.add_header(format!("Content-Length: {}\r\n", self.body.len() + 2));
 
         response_vec.append(&mut self.headers);
 
@@ -362,4 +361,95 @@ impl From<u16> for HttpStatusCode {
             _ => HttpStatusCode::Unknown(code),
         }
     }
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct WebSocketFrame {
+    FIN: bool,
+    RSV1: bool,
+    RSV2: bool,
+    RSV3: bool,
+    op_code: WebSocketOpCode,
+    mask: bool,
+    payload_length: usize,
+    mask_key: Option<u32>,
+    data: Vec<u8>,
+}
+
+impl WebSocketFrame {
+    #![allow(
+        unused_variables,
+        non_camel_case_types,
+        non_snake_case,
+        clippy::redundant_closure
+    )]
+    pub fn parseFrame(frame: &[u8]) -> Result<Self, errors_stupid::StdStupidError> {
+        let mut frame_iteratored = frame.iter().peekable();
+
+        let byte1 = frame_iteratored
+            .next()
+            .ok_or_else(|| StdStupidError::From())?;
+
+        let FIN: bool = (byte1 & 128) > 0;
+        let RSV1: bool = (byte1 & 64) > 0;
+        let RSV2: bool = (byte1 & 32) > 0;
+        let RSV3: bool = (byte1 & 16) > 0;
+
+        let op_code = match byte1 & 15 {
+            0 => WebSocketOpCode::Continuation,
+            1 => WebSocketOpCode::Text,
+            2 => WebSocketOpCode::Binary,
+            3..=7 => WebSocketOpCode::NonControl,
+            8 => WebSocketOpCode::ConnectionClose,
+            9 => WebSocketOpCode::Ping,
+            10 => WebSocketOpCode::Pong,
+            11..=15 => WebSocketOpCode::FutureControl,
+            _ => WebSocketOpCode::Invalid,
+        };
+
+        let byte2 = frame_iteratored
+            .next()
+            .ok_or_else(|| StdStupidError::From())?;
+
+        let mask = (byte2 & 128) > 0;
+
+        if !mask {
+            todo!("Drop connection here")
+        }
+        let mut payload_length: usize = (byte2 & 127) as usize;
+
+        // Otherwise check 16 bits
+        if payload_length == 126 {
+            for i in frame_iteratored.take(2) {
+                payload_length += *i as usize;
+            }
+        }
+        // Otherwise check 64 bits
+        else if payload_length == 127 {
+            let mut okay: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+            for i in 0..8 {
+                okay[i] = frame_iteratored
+                    .next()
+                    .ok_or_else(|| StdStupidError::From())?
+                    .to_owned();
+            }
+            let end: usize = usize::from_le_bytes(okay.as_slice().try_into().unwrap());
+        }
+
+        todo!();
+    }
+}
+#[allow(dead_code)]
+#[derive(Debug)]
+enum WebSocketOpCode {
+    Continuation,
+    Text,
+    Binary,
+    NonControl,
+    ConnectionClose,
+    Ping,
+    Pong,
+    FutureControl,
+    Invalid,
 }

@@ -1,35 +1,11 @@
 pub mod thread_manager;
 
-use crate::thread_manager::*;
+use core::str;
 
 use errors_stupid::*;
+use sha1::{Digest, Sha1, Sha1Core};
 
-pub fn map_range(
-    min_in: i64,
-    max_in: i64,
-    min_out: i64,
-    max_out: i64,
-    value: i64,
-) -> Result<i64, StdStupidError> {
-    if min_in > value || max_in < value {
-        return Err(IntValueError::new("Value out of bounds of input").into());
-    }
-
-    if min_in > max_in || max_out < min_out {
-        return Err(IntValueError::new(
-            "Value provided for the in/output bounds are invalid as max is not greater than min",
-        )
-        .into());
-    }
-
-    let slope: f64 = (max_out - min_out) as f64 / (max_in - min_in) as f64;
-
-    let output: i64 = (min_out as f64 + (slope * (value - min_in) as f64)) as i64;
-
-    Ok(output)
-}
-
-pub fn findSubStringWithBytes(
+pub fn find_substring_bytes_start(
     array: &[u8],
     sub_string_as_bytes: &[u8],
 ) -> Result<u32, StdStupidError> {
@@ -62,9 +38,19 @@ pub fn findSubStringWithBytes(
     }
 }
 
+pub fn hash_text_sha1<T: AsRef<str>>(text: T) -> Result<Vec<u8>, StdStupidError> {
+    let mut hasher = Sha1::new();
+
+    hasher.update(text.as_ref());
+
+    let ok = hasher.finalize();
+
+    Ok(ok[..].to_vec())
+}
+
 #[cfg(test)]
 mod standard_stupid_tests {
-    use crate::findSubStringWithBytes;
+    use crate::find_substring_bytes_start;
 
     #[test]
     #[should_panic]
@@ -72,7 +58,7 @@ mod standard_stupid_tests {
         let input = "Does not Match";
         let sub_string = "hello";
 
-        findSubStringWithBytes(input.as_bytes(), sub_string.as_bytes()).unwrap();
+        find_substring_bytes_start(input.as_bytes(), sub_string.as_bytes()).unwrap();
     }
 
     #[test]
@@ -80,7 +66,7 @@ mod standard_stupid_tests {
         let input = "Does match";
         let sub_string = "match";
 
-        let location = findSubStringWithBytes(input.as_bytes(), sub_string.as_bytes()).unwrap();
+        let location = find_substring_bytes_start(input.as_bytes(), sub_string.as_bytes()).unwrap();
 
         assert_eq!(location, 5);
     }
@@ -90,7 +76,7 @@ mod standard_stupid_tests {
         let input = "Match";
         let sub_string = "Match";
 
-        let location = findSubStringWithBytes(input.as_bytes(), sub_string.as_bytes()).unwrap();
+        let location = find_substring_bytes_start(input.as_bytes(), sub_string.as_bytes()).unwrap();
 
         assert_eq!(location, 0)
     }

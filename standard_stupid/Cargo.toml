@@ -11,3 +11,5 @@ tracing = { version = "0.1.38", default-features = false, features = [
   "valuable",
   "async-await",
 ] }
+
+sha1 = "0.10.6"

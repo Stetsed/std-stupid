@@ -62,6 +62,7 @@ impl Drop for ThreadPool {
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct ThreadWorker {
     task_id: usize,

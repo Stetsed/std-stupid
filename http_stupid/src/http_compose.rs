@@ -4,19 +4,22 @@ use crate::*;
 
 const DISALLOWED_PATTERNS: [&str; 2] = ["..", "./"];
 
-/// Takes in the HTTP's server function and the parsed data from
-/// [`httpParser::parse_http_connection()`], and depending on the server type either spits out the
-/// headers made in the request when server_function is Debug, or gets the file requested if
+/// Takes HTTP's server function and the parsed data from
+/// [`httpParser::parse_http_connection()`], depending on the server type spits out the
+/// headers in the request when server_function is Debug, or gets the file requested if
 /// server_function is ServeFile, if function is ServeFile also makes sure it is not attempting to
 /// do a file path escape.
 pub fn compose_http_response(
-    http_server_function: server_function,
+    http_server_function: ServerFunction,
+    http_keep_alive: bool,
     parse_return_data: ParseReturnData,
 ) -> Vec<u8> {
-    if server_function::Debug == http_server_function || http_server_function == server_function::DumpRequest {
+    if ServerFunction::Debug == http_server_function
+        || http_server_function == ServerFunction::DumpRequest
+    {
         let mut http_response_struct = HttpResponseStruct::new();
 
-        http_response_struct.setStatus(200);
+        http_response_struct.set_status(200);
 
         let mut response_body: String = "<html>".to_string();
 
@@ -31,27 +34,30 @@ pub fn compose_http_response(
 
         response_body.push_str("<html/>");
 
-        http_response_struct.setBody(response_body);
-        http_response_struct.addDefaultHeaders();
+        http_response_struct.set_body(response_body);
+        http_response_struct.add_default_headers();
+        if http_keep_alive {
+            http_response_struct.add_header("Keep-Alive: 7s");
+        } else {
+            http_response_struct.add_header("Connection: close");
+        }
 
-        http_response_struct.getResponse()
-        
-
-    } else if server_function::ServeFile == http_server_function {
-        if HttpRequestType::GET != parse_return_data.HttpRequestType {
+        http_response_struct.get_response()
+    } else if ServerFunction::ServeFile == http_server_function {
+        if HttpRequestType::GET != parse_return_data.http_request_type {
             let mut response: HttpResponseStruct = HttpResponseStruct::new();
 
-            response.addDefaultHeaders();
+            response.add_default_headers();
 
-            response.setStatus(405);
+            response.set_status(405);
 
-            response.getResponse()
+            response.get_response()
         } else {
             let document_root = "./";
 
             let mut path = document_root.to_string();
 
-            let path_given = &parse_return_data.requestPath[1..];
+            let path_given = &parse_return_data.request_path[1..];
 
             let mut contains_prohibited = false;
 
@@ -66,11 +72,11 @@ pub fn compose_http_response(
             if contains_prohibited {
                 let mut response: HttpResponseStruct = HttpResponseStruct::new();
 
-                response.addDefaultHeaders();
+                response.add_default_headers();
 
-                response.setStatus(403);
+                response.set_status(403);
 
-                response.getResponse()
+                response.get_response()
             } else {
                 let mut response: HttpResponseStruct = HttpResponseStruct::new();
 
@@ -84,28 +90,27 @@ pub fn compose_http_response(
 
                         match read_status {
                             Ok(_) => {
-                                response.setBody(buffer);
-                                response.setStatus(200);
+                                response.set_body(buffer);
+                                response.set_status(200);
                             }
                             Err(_) => {
                                 debug!("File read failed");
-                                response.setStatus(500)
+                                response.set_status(500)
                             }
                         };
                     }
                     Err(_) => {
                         debug!("File was not found");
-                        response.setStatus(404)
+                        response.set_status(404)
                     }
                 };
 
-                response.addDefaultHeaders();
+                response.add_default_headers();
 
-                response.getResponse()
+                response.get_response()
             }
         }
-    }
-    else {
+    } else {
         todo!()
     }
 }
@@ -114,11 +119,11 @@ pub fn compose_http_response(
 pub fn compose_server_error() -> Vec<u8> {
     let mut http_response_struct = HttpResponseStruct::new();
 
-    http_response_struct.setStatus(500);
+    http_response_struct.set_status(500);
 
-    http_response_struct.addDefaultHeaders();
+    http_response_struct.add_default_headers();
 
-    http_response_struct.getResponse()
+    http_response_struct.get_response()
 }
 
 /// Takes in the header as a Generic of a ref type of string, and converts it to bytes and appends

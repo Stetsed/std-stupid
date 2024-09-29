@@ -77,6 +77,7 @@ pub enum StdStupidError {
     ParseFloat(std::num::ParseFloatError),
     StdIO(std::io::Error),
     AddrParse(std::net::AddrParseError),
+    From(),
 }
 
 impl Error for StdStupidError {}

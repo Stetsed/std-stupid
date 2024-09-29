@@ -2,12 +2,9 @@ use crate::*;
 use errors_stupid::StdStupidError;
 use std::{collections::HashMap, str};
 
-use tracing::{debug, error, field::debug, info, span, warn, Level};
+use tracing::debug;
 
-/// Takes an argument of `&[u8]` with the data contained being that from a buffered reader on a
-/// TCPListerner and returns the data contained within including the httpVersion used, the type of request that was recieved, the path that was requested,
-/// and lastly a hash map of all the headers in a <String, String> format where the key is the
-/// header name and the content is the headers content inside of the Struct of [`httpStruct::ParseReturnData`]
+/// Takes an argument of `&[u8]` with the data contained being that from a buffered reader on a TCPListerner and returns the data contained within including the httpVersion used, the type of request that was recieved, the path that was requested, and lastly a hash map of all the headers in a <String, String> format where the key is the header name and the content is the headers content inside of the Struct of [`httpStruct::ParseReturnData`]
 pub fn parse_http_connection(
     connection_data_raw: &[u8],
 ) -> Result<ParseReturnData, StdStupidError> {
@@ -71,7 +68,9 @@ pub fn parse_http_connection(
             let http_header_name = header[0].trim().to_string();
             let http_header_content = header[1..].concat().trim().to_string();
 
-            header_hash_map.insert(http_header_name, http_header_content);
+            if !http_header_name.is_empty() && !http_header_name.is_empty() {
+                header_hash_map.insert(http_header_name, http_header_content);
+            }
         }
     }
 
@@ -95,28 +94,31 @@ pub fn parse_http_connection(
         debug!(
             request_path = http_path_given, request_type = ?http_request_type_given, version = ?http_version_given
         );
+        debug!("-----Headers Contents----- ");
         for (header, content) in &header_hash_map {
-            println!("Header: {header} : {content}");
+            debug!("{header} = {content}");
         }
+        debug!("-----Headers End----- ");
         if !body.is_empty() {
-            println!("\n-----Body Contents----- ");
+            debug!("\n-----Body Contents----- ");
             for i in body.splitn(64, "&") {
-                println!("{}", i);
+                debug!("{}", i);
             }
-            println!("\n-----Body ended-----");
+            debug!("\n-----Body ended-----");
         }
     }
 
     Ok(ParseReturnData {
-        httpVersion: http_version_given
+        http_version: http_version_given
             .ok_or_else(|| HttpServerError::new("HTTP Version of the connection was invalid"))?,
-        HttpRequestType: http_request_type_given.ok_or_else(|| {
+        http_request_type: http_request_type_given.ok_or_else(|| {
             HttpServerError::new("Request Type Version of the connection was invalid")
         })?,
-        requestPath: http_path_given.ok_or_else(|| {
+        request_path: http_path_given.ok_or_else(|| {
             HttpServerError::new("Request Path Version of the connection was invalid")
         })?,
         headers: header_hash_map,
+        body,
     })
 }
 
