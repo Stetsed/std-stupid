@@ -270,12 +270,6 @@ fn process_websocket_connection(
     let mut buff_reader = BufReader::new(stream.try_clone()?);
     let mut buff_writer = BufWriter::new(stream.try_clone()?);
 
-    let mut test_frame = WebSocketFrame::default();
-
-    test_frame.set_message("GOOD MORNING VIETNAAAM");
-
-    buff_writer.write_all(&test_frame.create_message_frame()?);
-    buff_writer.flush();
     loop {
         let now = Instant::now();
 
