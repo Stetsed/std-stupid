@@ -2,11 +2,11 @@ use base64::prelude::*;
 use std::{
     fmt::Debug,
     fs::write,
-    io::{self, prelude::*, BufReader, Write},
+    io::{self, prelude::*, BufReader, BufWriter, Write},
     net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream},
     time::{Duration, Instant},
 };
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, field::debug, info, trace};
 
 use crate::{http_compose::compose_http_response, http_parser::*, http_struct::*};
 
@@ -150,7 +150,7 @@ impl HttpServer {
             match stream {
                 Ok(mut o) => {
                     self.thread_pool.execute(move || {
-                        process_connection(server_function, http_keep_alive, &mut o, Instant::now())
+                        process_connection(server_function, http_keep_alive, &mut o)
                     });
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -167,18 +167,33 @@ fn process_connection(
     server_function_type: ServerFunction,
     http_keep_alive: bool,
     stream: &mut TcpStream,
-    mut execute_time: Instant,
 ) {
+    let handle = process_http_connection(server_function_type, http_keep_alive, stream);
+
+    // If the return is some it means we got an option of Some which means we need to call the
+    // websocket handler for the rest of the connection
+    if handle.is_some() {
+        debug!("Got a HTTP handle value of some, switching over to websocket handler");
+        let _ = process_websocket_connection(http_keep_alive, stream);
+    }
+}
+
+fn process_http_connection(
+    server_function_type: ServerFunction,
+    http_keep_alive: bool,
+    stream: &mut TcpStream,
+) -> Option<()> {
+    let mut execute_time: Instant = Instant::now();
+    let mut receive_buffer: [u8; MAX_RECIEVE_BUFFER] = [0; MAX_RECIEVE_BUFFER];
     loop {
         let now = Instant::now();
-        let mut receive_buffer: [u8; MAX_RECIEVE_BUFFER] = [0; MAX_RECIEVE_BUFFER];
 
         let amount = stream.read(&mut receive_buffer).unwrap_or(0);
 
         trace!("Recieved a message of {} bytes", amount);
 
         if server_function_type == ServerFunction::DumpRequest {
-            write("./request.binary", receive_buffer).unwrap()
+            write("./request.binary", &receive_buffer).unwrap()
         }
 
         if amount == 0 {
@@ -203,11 +218,10 @@ fn process_connection(
                             let mut response_struct: HttpResponseStruct = HttpResponseStruct::new();
 
                             response_struct.set_status(101);
-                            response_struct.set_body("Websocket connection accepted");
 
                             let hash: Vec<u8> = hash_text_sha1(format!(
                                 "{}{}",
-                                *value, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+                                value, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
                             ))
                             .unwrap();
 
@@ -221,6 +235,7 @@ fn process_connection(
                             response_struct.add_header("Upgrade: websocket");
 
                             let _ = &stream.write_all(&response_struct.get_response());
+                            return Some(());
                         }
                         None => {
                             let _ = &stream.write_all(compose_server_error().as_slice());
@@ -242,7 +257,53 @@ fn process_connection(
         }
         if now.duration_since(execute_time) > Duration::from_secs(7) || !http_keep_alive {
             debug!("Connection expired or read no more data, closing");
-            break;
+            return None;
+        }
+    }
+}
+
+fn process_websocket_connection(
+    http_keep_alive: bool,
+    stream: &mut TcpStream,
+) -> Result<(), StdStupidError> {
+    let mut execute_time: Instant = Instant::now();
+    let mut buff_reader = BufReader::new(stream.try_clone()?);
+    let mut buff_writer = BufWriter::new(stream.try_clone()?);
+
+    let mut test_frame = WebSocketFrame::default();
+
+    test_frame.set_message("GOOD MORNING VIETNAAAM");
+
+    buff_writer.write_all(&test_frame.create_message_frame()?);
+    buff_writer.flush();
+    loop {
+        let now = Instant::now();
+
+        let result = buff_reader.fill_buf()?;
+
+        let result_length = result.len();
+
+        if result_length > 0 {
+            print!("Recieved Data Bitch");
+            trace!(
+                "Recieved a message of {} bytes inside of the websocket",
+                result.len()
+            );
+
+            let frame = WebSocketFrame::parseFrame(result.to_vec())?;
+
+            if frame.data.as_slice() == b"ping" {
+                todo!("Respond with pong bitch")
+            }
+
+            execute_time = Instant::now();
+
+            buff_reader.consume(result_length);
+        }
+
+        if now.duration_since(execute_time) > Duration::from_secs(7) || !http_keep_alive {
+            debug!("Connection expired or read no more data, closing the websocket connection");
+            return Ok(());
         }
     }
 }

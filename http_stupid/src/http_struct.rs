@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use errors_stupid::StdStupidError;
+use errors_stupid::{HttpServerError, StdStupidError};
 
 #[derive(Debug)]
 pub enum ConnectionReturn {
@@ -89,7 +89,9 @@ impl HttpResponseStruct {
 
         response_vec.append(&mut self.status);
 
-        self.add_header(format!("Content-Length: {}\r\n", self.body.len() + 2));
+        if !self.body.is_empty() {
+            self.add_header(format!("Content-Length: {}\r\n", self.body.len()));
+        }
 
         response_vec.append(&mut self.headers);
 
@@ -366,35 +368,128 @@ impl From<u16> for HttpStatusCode {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct WebSocketFrame {
-    FIN: bool,
-    RSV1: bool,
-    RSV2: bool,
-    RSV3: bool,
+    fin: bool,
+    rsv1: bool,
+    rsv2: bool,
+    rsv3: bool,
     op_code: WebSocketOpCode,
     mask: bool,
-    payload_length: usize,
-    mask_key: Option<u32>,
-    data: Vec<u8>,
+    payload_length: u64,
+    mask_key: Vec<u8>,
+    pub data: Vec<u8>,
+}
+
+impl Default for WebSocketFrame {
+    fn default() -> Self {
+        let fin = false;
+        let rsv1 = false;
+        let rsv2 = false;
+        let rsv3 = false;
+
+        let op_code = WebSocketOpCode::default();
+
+        let mask = true;
+
+        let payload_length: u64 = 0;
+
+        let mask_key: Vec<u8> = Vec::new();
+
+        let data: Vec<u8> = Vec::new();
+        WebSocketFrame {
+            fin,
+            rsv1,
+            rsv2,
+            rsv3,
+            op_code,
+            mask,
+            payload_length,
+            mask_key,
+            data,
+        }
+    }
 }
 
 impl WebSocketFrame {
-    #![allow(
-        unused_variables,
-        non_camel_case_types,
-        non_snake_case,
-        clippy::redundant_closure
-    )]
-    pub fn parseFrame(frame: &[u8]) -> Result<Self, errors_stupid::StdStupidError> {
-        let mut frame_iteratored = frame.iter().peekable();
+    pub fn set_message<T: AsRef<str>>(&mut self, message: T) {
+        self.data = message.as_ref().as_bytes().to_vec();
 
-        let byte1 = frame_iteratored
-            .next()
-            .ok_or_else(|| StdStupidError::From())?;
+        self.payload_length = self.data.len() as u64;
+    }
+    pub fn create_message_frame(&mut self) -> Result<Vec<u8>, StdStupidError> {
+        let mut frame: Vec<u8> = Vec::new();
 
-        let FIN: bool = (byte1 & 128) > 0;
-        let RSV1: bool = (byte1 & 64) > 0;
-        let RSV2: bool = (byte1 & 32) > 0;
-        let RSV3: bool = (byte1 & 16) > 0;
+        let mut byte_working: u8 = 0;
+
+        if self.fin {
+            byte_working += 128;
+        }
+        if self.rsv1 {
+            byte_working += 64;
+        }
+        if self.rsv2 {
+            byte_working += 32;
+        }
+        if self.rsv3 {
+            byte_working += 16
+        }
+
+        match self.op_code {
+            WebSocketOpCode::Continuation => byte_working += 0,
+            WebSocketOpCode::Text => byte_working += 1,
+            WebSocketOpCode::Binary => byte_working += 2,
+            // Not used in this current implementation
+            WebSocketOpCode::NonControl => byte_working += 0,
+            WebSocketOpCode::ConnectionClose => byte_working += 8,
+            WebSocketOpCode::Ping => byte_working += 9,
+            WebSocketOpCode::Pong => byte_working += 10,
+            // Not used in this current implementation
+            WebSocketOpCode::FutureControl => byte_working += 1,
+            WebSocketOpCode::Invalid => todo!("Time to do some sketchy shit doododa"),
+        };
+
+        // Insert the first byte which includes the FIN, RSV and OPCODE
+        frame.push(byte_working);
+
+        byte_working = 0;
+
+        // Setup payload length calculation.. kill me already :D
+
+        let data_length = self.data.len();
+
+        if data_length < 126 {
+            byte_working += data_length as u8;
+            frame.push(byte_working);
+        } else if data_length < u16::MAX as usize {
+            byte_working += 126;
+            frame.push(byte_working);
+
+            frame.extend_from_slice(&data_length.to_le_bytes());
+        } else if data_length < u64::MAX as usize {
+            byte_working += 127;
+            frame.push(byte_working);
+
+            frame.extend_from_slice(&data_length.to_le_bytes());
+        }
+
+        if self.mask {
+            return Err(
+                HttpServerError::new("Mask should not be set for a server responding").into(),
+            );
+        }
+
+        frame.extend(&self.data);
+
+        todo!()
+    }
+    pub fn parseFrame(frame: Vec<u8>) -> Result<Self, errors_stupid::StdStupidError> {
+        let mut frame_iteratored = frame.clone().into_iter();
+
+        let byte1 = frame_iteratored.next().ok_or(StdStupidError::From())?;
+
+        let fin: bool = (byte1 & 128) > 0;
+        let rsv1: bool = (byte1 & 64) > 0;
+        let rsv2: bool = (byte1 & 32) > 0;
+        let rsv3: bool = (byte1 & 16) > 0;
 
         let op_code = match byte1 & 15 {
             0 => WebSocketOpCode::Continuation,
@@ -408,42 +503,65 @@ impl WebSocketFrame {
             _ => WebSocketOpCode::Invalid,
         };
 
-        let byte2 = frame_iteratored
-            .next()
-            .ok_or_else(|| StdStupidError::From())?;
+        // Get the second byte from the frame, which holds the mask in bit 1, and the
+        // payload_length base in 2-7.
+        let byte2 = frame_iteratored.next().ok_or(StdStupidError::From())?;
 
         let mask = (byte2 & 128) > 0;
 
         if !mask {
             todo!("Drop connection here")
         }
-        let mut payload_length: usize = (byte2 & 127) as usize;
+        // Depending on payload length, if the payload length is not 126, or 127 then we use the 7
+        // bits as our payload length. However if it is 126 then we continue reading and take the
+        // next 2 bytes, 8 bytes if the value is 127, and then we take this as a number as little
+        // endian bytes.
+        let mut payload_length: u64 = (byte2 & 127) as u64;
 
-        // Otherwise check 16 bits
         if payload_length == 126 {
-            for i in frame_iteratored.take(2) {
-                payload_length += *i as usize;
+            let mut combine: [u8; 2] = [0, 0];
+            for (e, i) in frame_iteratored.by_ref().take(2).enumerate() {
+                combine[e] = i;
             }
-        }
-        // Otherwise check 64 bits
-        else if payload_length == 127 {
-            let mut okay: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
-            for i in 0..8 {
-                okay[i] = frame_iteratored
-                    .next()
-                    .ok_or_else(|| StdStupidError::From())?
-                    .to_owned();
+            payload_length = u64::from_le_bytes(combine[..].try_into().unwrap());
+        } else if payload_length == 127 {
+            let mut combine: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+            for (e, i) in frame_iteratored.by_ref().take(8).enumerate() {
+                combine[e] = i;
             }
-            let end: usize = usize::from_le_bytes(okay.as_slice().try_into().unwrap());
+            payload_length = u64::from_le_bytes(combine[..].try_into().unwrap());
         }
 
-        todo!();
+        // Get the mask
+        let mask_key: Vec<u8> = frame_iteratored.by_ref().take(4).collect();
+
+        if payload_length != frame_iteratored.len() as u64 {
+            todo!("Break request, somehow more or less payload than len?")
+        };
+
+        let data = frame_iteratored
+            .enumerate()
+            .map(|(i, pre_data)| pre_data ^ mask_key[i % 4])
+            .collect::<Vec<u8>>();
+
+        Ok(Self {
+            fin,
+            rsv1,
+            rsv2,
+            rsv3,
+            op_code,
+            mask,
+            payload_length,
+            mask_key,
+            data,
+        })
     }
 }
 #[allow(dead_code)]
-#[derive(Debug)]
-enum WebSocketOpCode {
+#[derive(Debug, Default)]
+pub enum WebSocketOpCode {
     Continuation,
+    #[default]
     Text,
     Binary,
     NonControl,
