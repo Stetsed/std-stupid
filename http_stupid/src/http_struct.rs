@@ -366,13 +366,13 @@ impl From<u16> for HttpStatusCode {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct WebSocketFrame {
     fin: bool,
     rsv1: bool,
     rsv2: bool,
     rsv3: bool,
-    op_code: WebSocketOpCode,
+    pub op_code: WebSocketOpCode,
     mask: bool,
     payload_length: u64,
     mask_key: Vec<u8>,
@@ -388,7 +388,7 @@ impl Default for WebSocketFrame {
 
         let op_code = WebSocketOpCode::default();
 
-        let mask = true;
+        let mask = false;
 
         let payload_length: u64 = 0;
 
@@ -414,8 +414,12 @@ impl WebSocketFrame {
         self.data = message.as_ref().as_bytes().to_vec();
 
         self.payload_length = self.data.len() as u64;
+
+        if self.data.len() as u64 != u64::MAX {
+            self.fin = true;
+        }
     }
-    pub fn create_message_frame(&mut self) -> Result<Vec<u8>, StdStupidError> {
+    pub fn create_server_message_frame(&mut self) -> Result<Vec<u8>, StdStupidError> {
         let mut frame: Vec<u8> = Vec::new();
 
         let mut byte_working: u8 = 0;
@@ -479,9 +483,9 @@ impl WebSocketFrame {
 
         frame.extend(&self.data);
 
-        todo!()
+        Ok(frame)
     }
-    pub fn parseFrame(frame: Vec<u8>) -> Result<Self, errors_stupid::StdStupidError> {
+    pub fn parse_frame(frame: Vec<u8>) -> Result<Self, errors_stupid::StdStupidError> {
         let mut frame_iteratored = frame.clone().into_iter();
 
         let byte1 = frame_iteratored.next().ok_or(StdStupidError::From())?;
@@ -510,7 +514,7 @@ impl WebSocketFrame {
         let mask = (byte2 & 128) > 0;
 
         if !mask {
-            todo!("Drop connection here")
+            todo!("No mask, Drop connection here")
         }
         // Depending on payload length, if the payload length is not 126, or 127 then we use the 7
         // bits as our payload length. However if it is 126 then we continue reading and take the
@@ -557,8 +561,7 @@ impl WebSocketFrame {
         })
     }
 }
-#[allow(dead_code)]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum WebSocketOpCode {
     Continuation,
     #[default]

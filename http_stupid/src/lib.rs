@@ -1,4 +1,5 @@
 use base64::prelude::*;
+use core::str;
 use std::{
     fmt::Debug,
     fs::write,
@@ -168,39 +169,62 @@ fn process_connection(
     http_keep_alive: bool,
     stream: &mut TcpStream,
 ) {
-    let handle = process_http_connection(server_function_type, http_keep_alive, stream);
+    let mut stream_writer = BufWriter::new(stream.try_clone().unwrap());
+    let mut stream_reader = BufReader::new(stream.try_clone().unwrap());
+
+    let handle = process_http_connection(
+        server_function_type,
+        http_keep_alive,
+        &mut stream_writer,
+        &mut stream_reader,
+    );
 
     // If the return is some it means we got an option of Some which means we need to call the
     // websocket handler for the rest of the connection
-    if handle.is_some() {
-        debug!("Got a HTTP handle value of some, switching over to websocket handler");
-        let _ = process_websocket_connection(http_keep_alive, stream);
+    match handle {
+        Ok(o) => {
+            if o {
+                debug!("Got a HTTP handle value of some, switching over to websocket handler");
+                let _ = process_websocket_connection(
+                    http_keep_alive,
+                    &mut stream_writer,
+                    &mut stream_reader,
+                );
+            }
+        }
+        Err(_) => trace!("Connection is finished"),
     }
 }
 
+// Function takes in the server function, if the connection is being keep alived, and the stream
+// writer and reader. It will return a result of <bool, StdStupidError>, if the bool is true it
+// means it has requested to switch over to a websocket connection.
 fn process_http_connection(
     server_function_type: ServerFunction,
     http_keep_alive: bool,
-    stream: &mut TcpStream,
-) -> Option<()> {
+    stream_writer: &mut BufWriter<TcpStream>,
+    stream_reader: &mut BufReader<TcpStream>,
+) -> Result<bool, StdStupidError> {
     let mut execute_time: Instant = Instant::now();
-    let mut receive_buffer: [u8; MAX_RECIEVE_BUFFER] = [0; MAX_RECIEVE_BUFFER];
     loop {
         let now = Instant::now();
 
-        let amount = stream.read(&mut receive_buffer).unwrap_or(0);
+        let receive_buffer = stream_reader.fill_buf()?;
+
+        let amount = receive_buffer.len();
 
         trace!("Recieved a message of {} bytes", amount);
 
         if server_function_type == ServerFunction::DumpRequest {
-            write("./request.binary", &receive_buffer).unwrap()
+            write("./request.binary", receive_buffer).unwrap()
         }
 
         if amount == 0 {
-            let _ = stream.write_all(&compose_server_error());
+            stream_writer.write_all(&compose_server_error())?;
+            stream_writer.flush()?;
             trace!("Responded to message with error");
         } else {
-            match parse_http_connection(&receive_buffer) {
+            match parse_http_connection(receive_buffer) {
                 Ok(w)
                     if w.headers.get("Connection") == Some(&"Upgrade".to_string())
                         && w.headers.get("Sec-WebSocket-Version") == Some(&"13".to_string()) =>
@@ -234,57 +258,72 @@ fn process_http_connection(
                             response_struct.add_header("Connection: Upgrade");
                             response_struct.add_header("Upgrade: websocket");
 
-                            let _ = &stream.write_all(&response_struct.get_response());
-                            return Some(());
+                            stream_writer.write_all(&response_struct.get_response())?;
+                            stream_writer.flush()?;
+                            stream_reader.consume(amount);
+                            return Ok(true);
                         }
                         None => {
-                            let _ = &stream.write_all(compose_server_error().as_slice());
+                            stream_writer.write_all(compose_server_error().as_slice())?;
+                            stream_writer.flush()?;
                         }
                     }
                 }
                 Ok(d) => {
-                    let _ = &stream.write_all(
+                    stream_writer.write_all(
                         compose_http_response(server_function_type, http_keep_alive, d).as_slice(),
-                    );
+                    )?;
+                    stream_writer.flush()?;
                     trace!("Responded to message with sucess");
                     execute_time = Instant::now();
                 }
                 Err(_) => {
-                    let _ = &stream.write_all(compose_server_error().as_slice());
+                    stream_writer.write_all(compose_server_error().as_slice())?;
+                    stream_writer.flush()?;
                     trace!("Responded to message with error");
                 }
             };
         }
+        stream_reader.consume(amount);
+
         if now.duration_since(execute_time) > Duration::from_secs(7) || !http_keep_alive {
             debug!("Connection expired or read no more data, closing");
-            return None;
+            return Ok(false);
         }
     }
 }
 
 fn process_websocket_connection(
     http_keep_alive: bool,
-    stream: &mut TcpStream,
+    stream_writer: &mut BufWriter<TcpStream>,
+    stream_reader: &mut BufReader<TcpStream>,
 ) -> Result<(), StdStupidError> {
     let mut execute_time: Instant = Instant::now();
-    let mut buff_reader = BufReader::new(stream.try_clone()?);
-    let mut buff_writer = BufWriter::new(stream.try_clone()?);
 
+    let mut test_frame = WebSocketFrame::default();
+
+    test_frame.set_message("Websocket is connected :D");
+
+    stream_writer.write_all(&test_frame.create_server_message_frame()?)?;
+    stream_writer.flush()?;
     loop {
         let now = Instant::now();
 
-        let result = buff_reader.fill_buf()?;
+        let result = stream_reader.fill_buf()?;
 
         let result_length = result.len();
 
         if result_length > 0 {
-            print!("Recieved Data Bitch");
-            trace!(
+            debug!(
                 "Recieved a message of {} bytes inside of the websocket",
                 result.len()
             );
 
-            let frame = WebSocketFrame::parseFrame(result.to_vec())?;
+            let frame = WebSocketFrame::parse_frame(result.to_vec())?;
+
+            if frame.op_code == WebSocketOpCode::Text {
+                debug!("Web-Socket Frame Text: {}", str::from_utf8(&frame.data)?);
+            }
 
             if frame.data.as_slice() == b"ping" {
                 todo!("Respond with pong bitch")
@@ -292,7 +331,7 @@ fn process_websocket_connection(
 
             execute_time = Instant::now();
 
-            buff_reader.consume(result_length);
+            stream_reader.consume(result_length);
         }
 
         if now.duration_since(execute_time) > Duration::from_secs(7) || !http_keep_alive {
