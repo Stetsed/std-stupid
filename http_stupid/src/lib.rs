@@ -7,7 +7,7 @@ use std::{
     net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream},
     time::{Duration, Instant},
 };
-use tracing::{debug, error, field::debug, info, trace};
+use tracing::{debug, error, info, trace};
 
 use crate::{http_compose::compose_http_response, http_parser::*, http_struct::*};
 
@@ -16,7 +16,6 @@ use errors_stupid::StdStupidError;
 use http_compose::compose_server_error;
 use standard_stupid::{hash_text_sha1, thread_manager::*};
 
-const MAX_RECIEVE_BUFFER: usize = 2048;
 const DEFAULT_LISTEN_TO_PORT: u16 = 8080;
 const DEFAULT_LISTEN_TO_IP: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
 

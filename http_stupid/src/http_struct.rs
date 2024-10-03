@@ -365,7 +365,6 @@ impl From<u16> for HttpStatusCode {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct WebSocketFrame {
     fin: bool,
