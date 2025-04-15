@@ -1,5 +1,7 @@
-pub mod thread_manager;
+#![feature(const_size_of_val)]
 
+pub mod protocol;
+pub mod thread_manager;
 use core::str;
 
 use errors_stupid::*;

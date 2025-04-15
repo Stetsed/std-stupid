@@ -11,5 +11,17 @@ tracing = { version = "0.1.38", default-features = false, features = [
   "valuable",
   "async-await",
 ] }
-
 sha1 = "0.10.6"
+thiserror = "2"
+
+# These are only needed for the protocol
+blake2 = { version = "^0.10", optional = true, default-features = false, features = [
+  "reset",
+  "size_opt",
+] }
+
+
+[features]
+default = ["thread_manager", "protocol"]
+protocol = ["dep:blake2"]
+thread_manager = []

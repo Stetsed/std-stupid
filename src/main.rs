@@ -7,9 +7,7 @@ use http_stupid::HttpServer;
 use tracing::Level;
 
 fn main() -> Result<(), StdStupidError> {
-    tracing_subscriber::fmt()
-        .with_max_level(Level::DEBUG)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     let IpAddressToUse = "0.0.0.0";
     let portTouse: u16 = 9182;
@@ -18,7 +16,7 @@ fn main() -> Result<(), StdStupidError> {
         ServerFunction::Debug,
         Some(IpAddressToUse),
         Some(portTouse),
-        256,
+        64,
         true,
     )?;
 
